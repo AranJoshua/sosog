@@ -1,0 +1,32 @@
+---
+import { getStructurePhoto } from '../lib/photos';
+
+interface Props {
+  id: string;
+  name: string;
+  municipality: string;
+  photo?: string | null;
+  yearBuilt?: string | null;
+  showMunicipality?: boolean;
+  class?: string;
+}
+
+const { id, name, municipality, photo: photoKey, yearBuilt, showMunicipality = true, class: extra = '' } = Astro.props;
+const photo = getStructurePhoto(photoKey ?? id, 'thumb');
+const meta = [showMunicipality ? municipality : null, yearBuilt].filter(Boolean).join(', ');
+---
+<a href={`/structures/${id}`} data-sp={id} class={`print group ${extra}`}>
+  <span class="print-frame">
+    {photo ? (
+      <span class="print-img"><img src={photo} alt="" width="480" height="360" loading="lazy" decoding="async" draggable="false" /></span>
+    ) : (
+      <span class="print-empty">No photo available</span>
+    )}
+  </span>
+  <span class="mt-4 flex items-start justify-between gap-4">
+    <span class="min-w-0">
+      <span class="block font-display text-[1.28rem] leading-[1.15]"><span class="link-draw">{name}</span></span>
+      {meta && <span class="mt-1.5 block text-[0.95rem] text-cream/65">{meta}</span>}
+    </span>
+  </span>
+</a>

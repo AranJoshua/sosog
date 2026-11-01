@@ -1,0 +1,42 @@
+---
+const links = [
+  { href: '/map', label: 'Map' },
+  { href: '/technical', label: 'Technical Description' },
+  { href: '/history', label: 'History' },
+  { href: '/stories', label: 'Feature Stories' },
+  { href: '/glimpse', label: 'Glimpse of Sorsogon' },
+  { href: '/about', label: 'About Us' }
+];
+---
+<footer class="text-cream" style="margin-top: var(--footer-gap, 0px)">
+  <div class="wall-ink">
+    <div class="mx-auto grid max-w-[84rem] gap-x-16 gap-y-12 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[1.2fr_1fr_1fr]">
+      <div>
+        <p class="font-display text-[clamp(3.4rem,6vw,4.8rem)] leading-[0.9]" style="font-family: var(--font-wordmark)">SOSOG</p>
+        <p class="mt-6 max-w-sm text-[1.08rem] leading-relaxed text-cream/85">
+          The historical structures of Sorsogon province, recorded by civil engineering students of Bicol University.
+        </p>
+      </div>
+      <nav aria-label="Footer" class="lg:pt-3">
+        <ul class="grid gap-x-8 gap-y-1 sm:grid-cols-2 lg:grid-cols-1">
+          {links.map((l) => (
+            <li>
+              <a href={l.href} class="group inline-block py-1.5 text-[1.08rem] font-semibold text-cream/90 hover:text-cream"><span class="link-draw">{l.label}</span></a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <div class="text-[1rem] leading-relaxed text-cream/80 lg:pt-3">
+        <p>
+          Province boundaries come from the Philippine Statistics Authority (PSGC), through the open-source{' '}
+          <a class="font-semibold text-cream underline decoration-cream/40 underline-offset-4 hover:decoration-cream" href="https://github.com/faeldon/philippines-json-maps">philippines-json-maps</a>{' '}
+          project.
+        </p>
+        <a href="#top" class="group mt-7 inline-block font-bold text-cream"><span class="link-draw">Back to top</span></a>
+      </div>
+    </div>
+  </div>
+  <div class="bg-maroon">
+    <p class="mx-auto max-w-[84rem] px-5 py-5 text-[0.95rem] text-cream/85 sm:px-8">SOSOG is a BSCE research project of Bicol University.</p>
+  </div>
+</footer>

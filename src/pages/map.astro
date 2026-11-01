@@ -1,0 +1,64 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ProvinceMap from '../components/Map.tsx';
+import ProvinceModel from '../components/ProvinceModel.astro';
+import { getCollection } from 'astro:content';
+import { getStructurePhoto } from '../lib/photos';
+import { excerpt } from '../lib/text';
+import { groupByMunicipality } from '../lib/structures';
+
+const structures = await getCollection('structures');
+const pins = structures
+  .map((s) => ({
+    id: s.id,
+    name: s.data.name,
+    municipality: s.data.municipality,
+    latitude: s.data.latitude,
+    longitude: s.data.longitude,
+    classification: s.data.classification ?? null,
+    yearBuilt: s.data.yearBuilt ?? null,
+    materials: s.data.materials ?? null,
+    occupancy: s.data.occupancy ?? null,
+    photo: getStructurePhoto(s.data.photo ?? s.id, 'thumb'),
+    summary: excerpt(s.data.technicalDescription, 230)
+  }))
+  .sort((a, b) => a.name.localeCompare(b.name));
+const groups = groupByMunicipality(structures);
+const years = structures.map((s) => Number.parseInt(s.data.yearBuilt ?? '', 10)).filter((y) => y >= 1500 && y <= 2100);
+const stats = [
+  { n: structures.length, label: 'structures on the map' },
+  { n: groups.length, label: 'municipalities with records' },
+  ...(years.length ? [{ n: Math.min(...years), label: 'year of the oldest' }] : [])
+];
+---
+<Layout title="Map" tone="navy" description="An interactive map of the historical structures of Sorsogon province.">
+  <main id="main">
+    <header class="wall-navy overflow-hidden">
+      <div class="mx-auto grid max-w-[84rem] items-center gap-4 px-5 sm:px-8 lg:grid-cols-[1fr_1.05fr]">
+        <div class="py-14 sm:py-20">
+          <h1 class="display-lg max-w-[12ch]">Historical structures of Sorsogon</h1>
+          <p class="lead mt-6 text-cream/85">Select a municipality to raise it from the rest, then choose a marker to see the structure's photo, location, and a summary of its technical description.</p>
+          <dl class="mt-9 flex flex-wrap gap-x-10 gap-y-5">
+            {stats.map((s) => (
+              <div>
+                <dt class="figure text-[clamp(2.4rem,5vw,3.2rem)] leading-none">{s.n}</dt>
+                <dd class="mt-1.5 max-w-[9rem] text-[0.98rem] leading-snug text-cream/75">{s.label}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <div class="hidden self-center lg:-mr-10 lg:ml-auto lg:block lg:w-[88%] lg:pb-14 lg:pt-6" aria-hidden="true">
+          <ProvinceModel board="maroon" pins={structures.map((s) => ({ latitude: s.data.latitude, longitude: s.data.longitude }))} documented={groups.map((g) => g.name)} />
+        </div>
+      </div>
+    </header>
+    <div class="wall-navy-mid pb-10 pt-12">
+      <div class="mx-auto max-w-[84rem] px-5 sm:px-8">
+        <ProvinceMap structures={pins} client:load />
+        <noscript>
+          <p class="mt-4 text-cream/80">The interactive map needs JavaScript. You can still browse every structure from the <a class="underline" href="/explore">Explore</a> page.</p>
+        </noscript>
+      </div>
+    </div>
+  </main>
+</Layout>

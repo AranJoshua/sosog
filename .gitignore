@@ -1,0 +1,30 @@
+# build output
+dist/
+# generated types
+.astro/
+
+# generated structure data, written by sync-sheet.ts
+src/content/structures/*.json
+
+# Structure photos in public/structures/ and public/glimpse/ ARE committed
+# (prepared locally with scripts/sosog_prep_photos.py), so they are not ignored.
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# environment variables
+.env
+.env.production
+
+# macOS-specific files
+.DS_Store
+
+# jetbrains setting folder
+.idea/

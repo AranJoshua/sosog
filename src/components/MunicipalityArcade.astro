@@ -1,0 +1,296 @@
+---
+import { getStructurePhoto } from '../lib/photos';
+import { countLabel } from '../lib/text';
+import Arrow from './Arrow.astro';
+
+export interface ArcadeItem {
+  name: string;
+  slug: string;
+  count: number;
+  /** Photo key (see src/lib/photos.ts) of the structure whose photo represents the municipality. */
+  photoKey: string | null;
+}
+
+interface Props {
+  items: ArcadeItem[];
+}
+
+const { items } = Astro.props;
+const slides = items.map((item) => ({ ...item, photo: item.photoKey ? getStructurePhoto(item.photoKey, 'large') ?? getStructurePhoto(item.photoKey, 'thumb') : null }));
+const middle = Math.floor(slides.length / 2);
+---
+<section class="arcade" data-arcade aria-label="Municipalities with documented structures">
+  <ul class="arcade-track gutter" data-track>
+    {slides.map((slide, i) => (
+      <li class:list={['arch', { 'is-active': i === middle }]} style={`--i:${i}`} data-arch>
+        <a href={`/explore/${slide.slug}`} class="group" aria-label={`${slide.name}, ${countLabel(slide.count)}`}>
+          <span class="arch-clip">
+            <span class="arch-in">
+              {slide.photo ? (
+                <img src={slide.photo} alt="" width="900" height="1200" loading="lazy" decoding="async" draggable="false" />
+              ) : (
+                <span class="arch-blank"></span>
+              )}
+              <span class="arch-shade"></span>
+              <span class="arch-label">
+                <span class="arch-name">{slide.name}</span>
+                <span class="arch-count">{countLabel(slide.count)}</span>
+                <span class="arch-go"><span class="link-draw">Open</span></span>
+              </span>
+            </span>
+          </span>
+        </a>
+      </li>
+    ))}
+  </ul>
+
+  <div class="arcade-tools gutter mt-10 items-center justify-between gap-6">
+    <p class="text-[1.05rem] font-semibold" data-arcade-count aria-live="polite"></p>
+    <div class="flex gap-4">
+      <button type="button" class="nav-arrow" data-prev aria-label="Previous municipality"><Arrow dir="left" /></button>
+      <button type="button" class="nav-arrow" data-next aria-label="Next municipality"><Arrow /></button>
+    </div>
+  </div>
+</section>
+
+<style>
+  .arcade {
+    --h: clamp(28rem, 72vh, 42rem);
+    --frame: var(--color-maroon);
+  }
+
+  /* Rail mode: phones, tablets, and anything without a hover pointer. */
+  .arcade-track {
+    display: flex;
+    gap: 1rem;
+    height: var(--h);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 1.25rem;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .arcade-track::-webkit-scrollbar {
+    display: none;
+  }
+  .arcade-tools {
+    display: flex;
+  }
+  .arch {
+    flex: 0 0 min(76vw, 20rem);
+    scroll-snap-align: center;
+    min-width: 0;
+  }
+  .arch > a {
+    display: block;
+    height: 100%;
+  }
+  /* A window casing: the stone surround is a solid band that thickens as the arch opens. */
+  .arch-clip {
+    display: block;
+    height: 100%;
+    padding: 0.6rem 0.6rem 0;
+    background: var(--frame);
+    border-radius: 999px 999px 0 0;
+    box-shadow: 0 34px 40px -30px rgb(33 17 18 / 0.75);
+  }
+  .arch-in {
+    position: relative;
+    display: block;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 999px 999px 0 0;
+    background: var(--color-navy);
+  }
+  .arch-in img,
+  .arch-blank {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .arch-in img {
+    transform: scale(1.14);
+    filter: saturate(0.7) brightness(0.8);
+    transition: transform 0.7s var(--ease-out), filter 0.45s;
+  }
+  .arch.is-active .arch-in img {
+    transform: scale(1);
+    filter: none;
+  }
+  .arch-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, var(--color-ink) 2%, color-mix(in srgb, var(--color-ink) 55%, transparent) 30%, transparent 62%);
+    opacity: 0.5;
+    transition: opacity 0.4s;
+  }
+  .arch.is-active .arch-shade {
+    opacity: 1;
+  }
+  .arch-label {
+    position: absolute;
+    inset: auto 0 0;
+    padding: 1.5rem 1.25rem 2rem;
+    text-align: center;
+    color: var(--color-cream);
+    opacity: 0;
+    transform: translateY(1.25rem);
+    transition: opacity 0.35s, transform 0.35s;
+  }
+  .arch.is-active .arch-label {
+    opacity: 1;
+    transform: none;
+    transition: opacity 0.45s var(--ease-out) 0.1s, transform 0.55s var(--ease-out) 0.1s;
+  }
+  .arch-name {
+    display: block;
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 3vw, 2.6rem);
+    line-height: 1;
+  }
+  .arch-count {
+    display: block;
+    margin-top: 0.65rem;
+    font-size: 1.02rem;
+    color: color-mix(in srgb, var(--color-cream) 82%, transparent);
+  }
+  .arch-go {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-top: 1.1rem;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  /* Hover mode: the whole province as one arcade; the arch under the pointer opens. */
+  @media (min-width: 900px) and (hover: hover) {
+    .arcade-track {
+      overflow: visible;
+      gap: 0.6rem;
+      scroll-snap-type: none;
+    }
+    .arcade-tools {
+      display: none;
+    }
+    .arch {
+      flex: 1 1 0;
+      transition: flex-grow 0.55s cubic-bezier(0.22, 1, 0.36, 1), transform 1.1s var(--ease-out) calc(var(--i) * 55ms), opacity 0.9s ease calc(var(--i) * 55ms);
+      will-change: flex-grow;
+    }
+    .arch.is-active {
+      flex-grow: 5.6;
+    }
+    .arch-label {
+      white-space: nowrap;
+    }
+  }
+
+  /* One reveal when the arcade scrolls into view: the arches rise in turn. */
+  :global(html.js) .arcade:not(.is-in) .arch {
+    opacity: 0;
+    transform: translateY(3.5rem);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(html.js) .arcade:not(.is-in) .arch {
+      opacity: 1;
+      transform: none;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-arcade]').forEach((root) => {
+    const track = root.querySelector<HTMLElement>('[data-track]');
+    const arches = Array.from(root.querySelectorAll<HTMLElement>('[data-arch]'));
+    if (!track || arches.length === 0) return;
+    const hoverMode = window.matchMedia('(min-width: 900px) and (hover: hover)');
+    const prev = root.querySelector<HTMLButtonElement>('[data-prev]');
+    const next = root.querySelector<HTMLButtonElement>('[data-next]');
+    const counter = root.querySelector<HTMLElement>('[data-arcade-count]');
+
+    const activate = (target: HTMLElement) => {
+      arches.forEach((a) => a.classList.toggle('is-active', a === target));
+      if (counter) counter.textContent = `${arches.indexOf(target) + 1} of ${arches.length}`;
+    };
+
+    // Reveal once.
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          root.classList.add('is-in');
+          io.disconnect();
+        }
+      },
+      { threshold: 0.2 }
+    );
+    io.observe(root);
+
+    // Hover mode: pointer and keyboard focus open an arch.
+    arches.forEach((arch) => {
+      arch.addEventListener('pointerenter', (event) => {
+        if (event.pointerType === 'mouse' && hoverMode.matches) activate(arch);
+      });
+      arch.addEventListener('focusin', () => {
+        activate(arch);
+        if (!hoverMode.matches) arch.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      });
+    });
+
+    // Rail mode: the arch nearest the centre is the active one.
+    const nearest = () => {
+      const rect = track.getBoundingClientRect();
+      const centre = rect.left + rect.width / 2;
+      let best = arches[0];
+      let bestDistance = Infinity;
+      for (const arch of arches) {
+        const r = arch.getBoundingClientRect();
+        const d = Math.abs(r.left + r.width / 2 - centre);
+        if (d < bestDistance) {
+          bestDistance = d;
+          best = arch;
+        }
+      }
+      return best;
+    };
+    const syncRail = () => {
+      if (hoverMode.matches) return;
+      activate(nearest());
+      const max = track.scrollWidth - track.clientWidth;
+      if (prev) prev.disabled = track.scrollLeft <= 2;
+      if (next) next.disabled = track.scrollLeft >= max - 2;
+    };
+    let ticking = false;
+    track.addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        syncRail();
+        ticking = false;
+      });
+    }, { passive: true });
+
+    const step = () => (arches[0].offsetWidth || 300) + 16;
+    prev?.addEventListener('click', () => track.scrollBy({ left: -step(), behavior: 'smooth' }));
+    next?.addEventListener('click', () => track.scrollBy({ left: step(), behavior: 'smooth' }));
+
+    // Start on a middle arch so there are neighbours on both sides.
+    const middle = arches[Math.floor(arches.length / 2)];
+    const place = () => {
+      activate(middle);
+      if (!hoverMode.matches) {
+        const t = track.getBoundingClientRect();
+        const m = middle.getBoundingClientRect();
+        track.style.scrollBehavior = 'auto';
+        track.scrollLeft += m.left + m.width / 2 - (t.left + t.width / 2);
+        track.style.scrollBehavior = '';
+        syncRail();
+      }
+    };
+    place();
+    hoverMode.addEventListener('change', place);
+    window.addEventListener('resize', syncRail);
+  });
+</script>

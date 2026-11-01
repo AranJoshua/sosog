@@ -1,0 +1,291 @@
+---
+import { MUNICIPALITY_BOUNDARIES } from './map/boundaries';
+import { MAP_HEIGHT, project } from '../lib/map-geometry';
+
+interface Props {
+  pins: { latitude: number; longitude: number }[];
+  documented: string[];
+  class?: string;
+  /** Colour of the model board the province sits on. */
+  board?: 'navy' | 'maroon';
+  /** Make the model reachable by keyboard (arrow keys turn it). Leave off where the model is decoration. */
+  focusable?: boolean;
+}
+const { pins, documented, class: extra = '', board = 'navy', focusable = false } = Astro.props;
+const has = new Set(documented);
+const dots = pins.map((p) => project(p.latitude, p.longitude));
+const VIEW = `-20 0 880 ${MAP_HEIGHT}`;
+
+/*
+ * A chipboard site model of the province, as an architecture student would cut one: full-province layers for the ground, then extra layers only under the municipalities that have documented structures, so those stand proud of the rest.
+ */
+const layers = [
+  { fill: '#211112', only: false },
+  { fill: '#371515', only: false },
+  { fill: '#461717', only: false },
+  { fill: '#2f4461', only: false, top: true },
+  { fill: '#8a2d2d', only: true },
+  { fill: '#c9b99c', only: true },
+  { fill: '#f1eace', only: true, top: true }
+];
+---
+<div class={`model ${extra}`} data-model data-board={board}>
+  <div
+    class="model-view"
+    data-model-view
+    {...(focusable ? { role: 'group', tabindex: 0, 'aria-label': 'Model of Sorsogon province. Drag it to turn it, or use the arrow keys. Double-click to reset.' } : {})}
+  >
+  <div class="model-slab" style={`aspect-ratio: 880 / ${MAP_HEIGHT}`}>
+    <div class="base-edge" aria-hidden="true"></div>
+    <div class="base" aria-hidden="true"></div>
+    <svg class="layer shadow" viewBox={VIEW} aria-hidden="true" style="--z:-1">
+      {MUNICIPALITY_BOUNDARIES.map((b) => <path d={b.d} fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round" />)}
+    </svg>
+    {layers.map((layer, i) => (
+      <svg class="layer" viewBox={VIEW} aria-hidden="true" style={`--z:${i}`}>
+        {MUNICIPALITY_BOUNDARIES.filter((b) => !layer.only || has.has(b.name)).map((b) => (
+          <path d={b.d} fill={layer.fill} stroke={layer.top ? (layer.fill === '#f1eace' ? '#461717' : '#211112') : layer.fill} stroke-opacity={layer.top ? 0.55 : 1} stroke-width={layer.top ? 1.4 : 1.2} stroke-linejoin="round" />
+        ))}
+      </svg>
+    ))}
+    <svg class="layer" viewBox={VIEW} aria-hidden="true" style={`--z:${layers.length}`}>
+      {dots.map((d) => (
+        <>
+          <circle cx={d.x} cy={d.y + 3} r="9" fill="#000" fill-opacity="0.35" />
+          <circle cx={d.x} cy={d.y} r="8" fill="#461717" stroke="#f1eace" stroke-width="3" />
+        </>
+      ))}
+    </svg>
+  </div>
+  </div>
+</div>
+
+<style>
+  @property --gap {
+    syntax: '<length>';
+    inherits: true;
+    initial-value: 0px;
+  }
+  .model {
+    --rx: 56deg;
+    --rz: -26deg;
+  }
+  .model-view {
+    perspective: 1700px;
+    perspective-origin: 50% 30%;
+    /* Horizontal drags turn the model; vertical drags on a touch screen still scroll the page. */
+    touch-action: pan-y;
+    cursor: grab;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .model-view[data-dragging] {
+    cursor: grabbing;
+  }
+  .model-view:focus-visible {
+    outline: 4px solid var(--color-maroon);
+    outline-offset: 6px;
+  }
+  .model-slab {
+    --gap: 11px;
+    position: relative;
+    aspect-ratio: 880 / 675.39;
+    width: 100%;
+    transform-style: preserve-3d;
+    transform: rotateX(var(--rx)) rotateZ(var(--rz));
+    transition: --gap 1.6s var(--ease-out);
+  }
+  :global(html.js) .model:not(.is-in) .model-slab {
+    --gap: 0px;
+  }
+  /* The model board: a thick slab the province is mounted on. */
+  .base,
+  .base-edge {
+    position: absolute;
+    inset: -3% -4% -5% -2%;
+  }
+  .base {
+    background: var(--board, var(--color-navy));
+    background-image: var(--grain);
+    transform: translateZ(calc(var(--gap) * -0.2));
+  }
+  .base-edge {
+    background: var(--color-ink);
+    transform: translateZ(calc(var(--gap) * -1.5));
+  }
+  [data-board='maroon'] {
+    --board: var(--color-maroon);
+  }
+  .layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: translateZ(calc(var(--z) * var(--gap)));
+    overflow: visible;
+  }
+  .layer.shadow {
+    filter: blur(22px);
+    opacity: 0.4;
+    transform: translateZ(calc(var(--gap) * -1.6)) translate(30px, 38px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .model-slab {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  // The model assembles layer by layer when it scrolls into view. It turns when dragged, from the buttons, or from the arrow keys,
+  // and stays still otherwise: nothing follows the pointer around the page.
+  const DEFAULT = { rz: -26, rx: 56 };
+  const LIMIT = { rzMin: -86, rzMax: 34, rxMin: 34, rxMax: 74 };
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+  document.querySelectorAll<HTMLElement>('[data-model]').forEach((model) => {
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          model.classList.add('is-in');
+          io.disconnect();
+        }
+      },
+      { threshold: 0.25 }
+    );
+    io.observe(model);
+
+    const view = model.querySelector<HTMLElement>('[data-model-view]');
+    if (!view) return;
+    const turns = Array.from(model.querySelectorAll<HTMLButtonElement>('[data-turn]'));
+    const reset = model.querySelector<HTMLButtonElement>('[data-reset]');
+
+    let rz = DEFAULT.rz; // what is drawn
+    let rx = DEFAULT.rx;
+    let tz = rz; // where it is heading
+    let tx = rx;
+    let vz = 0; // glide left after letting go, degrees per millisecond
+    let vx = 0;
+    let dragging = false;
+    let raf = 0;
+    let last = 0;
+
+    const draw = () => {
+      model.style.setProperty('--rz', `${rz.toFixed(2)}deg`);
+      model.style.setProperty('--rx', `${rx.toFixed(2)}deg`);
+    };
+    const syncButtons = () => {
+      turns.forEach((b) => {
+        const dir = Number(b.dataset.turn);
+        b.disabled = dir > 0 ? tz >= LIMIT.rzMax - 0.5 : tz <= LIMIT.rzMin + 0.5;
+      });
+      if (reset) reset.disabled = Math.abs(tz - DEFAULT.rz) < 0.5 && Math.abs(tx - DEFAULT.rx) < 0.5;
+    };
+    // Timing is worked out from the clock, not the frame count, so it feels the same on a slow screen.
+    const step = (now: number) => {
+      raf = 0;
+      const dt = Math.min(64, now - (last || now - 16));
+      last = now;
+      const gliding = !dragging && (Math.abs(vz) > 0.003 || Math.abs(vx) > 0.003);
+      if (gliding) {
+        tz = clamp(tz + vz * dt, LIMIT.rzMin, LIMIT.rzMax);
+        tx = clamp(tx + vx * dt, LIMIT.rxMin, LIMIT.rxMax);
+        const fade = Math.exp(-dt / 170);
+        vz *= fade;
+        vx *= fade;
+        if (tz === LIMIT.rzMin || tz === LIMIT.rzMax) vz = 0;
+        if (tx === LIMIT.rxMin || tx === LIMIT.rxMax) vx = 0;
+      }
+      // The drawn angle eases toward the target, so rough pointer movement comes out smooth.
+      const k = 1 - Math.exp(-dt / 70);
+      rz += (tz - rz) * k;
+      rx += (tx - rx) * k;
+      const settled = Math.abs(tz - rz) < 0.05 && Math.abs(tx - rx) < 0.05;
+      if (settled) {
+        rz = tz;
+        rx = tx;
+      }
+      draw();
+      syncButtons();
+      if (!settled || dragging || gliding) raf = requestAnimationFrame(step);
+      else last = 0;
+    };
+    const go = () => {
+      if (reduced) {
+        rz = tz;
+        rx = tx;
+        draw();
+        syncButtons();
+      } else if (!raf) raf = requestAnimationFrame(step);
+    };
+    const to = (nz: number, nx: number) => {
+      vz = vx = 0;
+      tz = clamp(nz, LIMIT.rzMin, LIMIT.rzMax);
+      tx = clamp(nx, LIMIT.rxMin, LIMIT.rxMax);
+      go();
+    };
+
+    // Drag. Dragging right moves the near edge of the model to the right, like a turntable.
+    let lastX = 0;
+    let lastY = 0;
+    let lastT = 0;
+    view.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      dragging = true;
+      lastX = event.clientX;
+      lastY = event.clientY;
+      lastT = event.timeStamp;
+      vz = vx = 0;
+      view.setPointerCapture(event.pointerId);
+      view.toggleAttribute('data-dragging', true);
+    });
+    view.addEventListener('pointermove', (event) => {
+      if (!dragging) return;
+      const dz = -(event.clientX - lastX) * 0.22;
+      const dxr = -(event.clientY - lastY) * 0.12;
+      const dtMove = Math.max(1, event.timeStamp - lastT);
+      lastX = event.clientX;
+      lastY = event.clientY;
+      lastT = event.timeStamp;
+      tz = clamp(tz + dz, LIMIT.rzMin, LIMIT.rzMax);
+      tx = clamp(tx + dxr, LIMIT.rxMin, LIMIT.rxMax);
+      // Remember how fast the last movements were, for the glide after release.
+      vz = vz * 0.5 + (dz / dtMove) * 0.5;
+      vx = vx * 0.5 + (dxr / dtMove) * 0.5;
+      go();
+    });
+    const release = (event: Event) => {
+      if (!dragging) return;
+      dragging = false;
+      view.removeAttribute('data-dragging');
+      // Holding still before letting go means no glide.
+      if (reduced || event.timeStamp - lastT > 90) vz = vx = 0;
+      go();
+    };
+    view.addEventListener('pointerup', release);
+    view.addEventListener('pointercancel', release);
+    view.addEventListener('lostpointercapture', release);
+
+    // Buttons and keys.
+    turns.forEach((b) => b.addEventListener('click', () => to(tz + Number(b.dataset.turn) * 14, tx)));
+    reset?.addEventListener('click', () => to(DEFAULT.rz, DEFAULT.rx));
+    view.addEventListener('dblclick', () => to(DEFAULT.rz, DEFAULT.rx));
+    view.addEventListener('keydown', (event) => {
+      const keys: Record<string, () => void> = {
+        ArrowLeft: () => to(tz + 8, tx),
+        ArrowRight: () => to(tz - 8, tx),
+        ArrowUp: () => to(tz, tx + 6),
+        ArrowDown: () => to(tz, tx - 6),
+        Home: () => to(DEFAULT.rz, DEFAULT.rx),
+        Escape: () => to(DEFAULT.rz, DEFAULT.rx)
+      };
+      const run = keys[event.key];
+      if (!run) return;
+      event.preventDefault();
+      run();
+    });
+
+    syncButtons();
+  });
+</script>

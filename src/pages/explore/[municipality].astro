@@ -1,0 +1,33 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import StructureCard from '../../components/StructureCard.astro';
+import { getCollection } from 'astro:content';
+import { groupByMunicipality } from '../../lib/structures';
+import { countLabel } from '../../lib/text';
+
+export async function getStaticPaths() {
+  const structures = await getCollection('structures');
+  return groupByMunicipality(structures).map((group) => ({ params: { municipality: group.slug }, props: { group } }));
+}
+
+const { group } = Astro.props;
+---
+<Layout title={group.name} tone="maroon">
+  <main id="main">
+    <PageHeader title={group.name} intro={`${countLabel(group.items.length)} documented. Open one to read its history and technical description.`}>
+      <a slot="back" href="/explore" class="group inline-block text-[1.02rem] font-bold"><span class="link-draw">All municipalities</span></a>
+    </PageHeader>
+    <section class="wall-maroon pb-8 pt-10">
+      <div class="mx-auto max-w-[84rem] px-5 sm:px-8">
+        <ul class="grid gap-x-8 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">
+          {group.items.map((s) => (
+            <li>
+              <StructureCard class="!w-full" id={s.id} name={s.data.name} municipality={s.data.municipality} photo={s.data.photo} yearBuilt={s.data.yearBuilt} showMunicipality={false} />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  </main>
+</Layout>

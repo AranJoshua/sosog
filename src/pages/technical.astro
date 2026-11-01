@@ -1,0 +1,28 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import RecordIndex from '../components/RecordIndex.astro';
+import { getCollection } from 'astro:content';
+import { groupByMunicipality } from '../lib/structures';
+import { headerPhoto } from '../lib/headers';
+import HeaderStats from '../components/HeaderStats.astro';
+
+const structures = await getCollection('structures');
+const groups = groupByMunicipality(structures);
+const photo = headerPhoto(structures, 'watchtower') ?? headerPhoto(structures, 'lighthouse') ?? headerPhoto(structures, 'government');
+const kinds = new Set(structures.map((s) => (s.data.classification ?? '').trim()).filter(Boolean));
+const assessed = structures.filter((s) => s.data.technicalDescription).length;
+const stats = [
+  { n: assessed, label: 'structures assessed' },
+  { n: kinds.size, label: 'kinds of building' },
+  { n: groups.length, label: 'municipalities' }
+];
+---
+<Layout title="Technical Description" tone="navy" description="Technical descriptions of the historical structures of Sorsogon: materials, condition, and construction.">
+  <main id="main">
+    <PageHeader tone="navy" title="Technical description of structures" intro="What each structure is built of, how it is put together, and the condition it was found in, from the team's field assessments." photo={photo} photoAlt="A historic watchtower in Sorsogon"><HeaderStats items={stats} /></PageHeader>
+    <div class="wall-navy-mid pt-16">
+      <RecordIndex groups={groups} field="technicalDescription" tab="technical" empty="No technical description has been recorded for this structure." />
+    </div>
+  </main>
+</Layout>

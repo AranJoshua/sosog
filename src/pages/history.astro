@@ -1,0 +1,30 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import RecordIndex from '../components/RecordIndex.astro';
+import { getCollection } from 'astro:content';
+import { groupByMunicipality } from '../lib/structures';
+import { headerPhoto } from '../lib/headers';
+import HeaderStats from '../components/HeaderStats.astro';
+
+const structures = await getCollection('structures');
+const groups = groupByMunicipality(structures);
+const photo = headerPhoto(structures, 'church') ?? headerPhoto(structures, 'ruins');
+const years = structures.map((s) => Number.parseInt(s.data.yearBuilt ?? '', 10)).filter((y) => y >= 1500 && y <= 2100);
+// Count what is true: the first figure is every structure, and the figure for written histories only appears when there is one.
+const withHistory = structures.filter((s) => s.data.history).length;
+const stats = [
+  { n: structures.length, label: 'structures documented' },
+  ...(withHistory > 0 ? [{ n: withHistory, label: 'with a written history' }] : []),
+  { n: groups.length, label: 'municipalities' },
+  ...(years.length ? [{ n: Math.min(...years), label: 'year of the oldest' }] : [])
+];
+---
+<Layout title="History" tone="maroon" description="The histories of the historical structures of Sorsogon, municipality by municipality.">
+  <main id="main">
+    <PageHeader title="History of structures" intro="When each structure was built, what it was used for, and what has happened to it since. Where records are thin, the page says so." photo={photo} photoAlt="A historic church in Sorsogon"><HeaderStats items={stats} /></PageHeader>
+    <div class="wall-maroon pt-16">
+      <RecordIndex groups={groups} field="history" tab="history" empty="Historical records for this structure are limited." />
+    </div>
+  </main>
+</Layout>
