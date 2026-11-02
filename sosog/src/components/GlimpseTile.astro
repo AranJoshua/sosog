@@ -1,0 +1,182 @@
+---
+interface Props {
+  photo: { n: number; thumb: string; large: string; width: number; height: number; lw: number };
+  /** What the picture shows, in plain words. Also read out by screen readers and shown in the viewer. */
+  caption?: string;
+  chapter?: string;
+  sizes?: string;
+  /** Use the large file as the fallback source (for prints shown big). */
+  big?: boolean;
+  /** `overlay` lays the caption on a solid plate over the print's corner; `below` sets it under the print. */
+  mode?: 'overlay' | 'below';
+  /** Fill the cell the tile sits in (mosaics). */
+  fill?: boolean;
+  /** The outline of the print. */
+  /** CSS object-position of the picture inside its outline. */
+  focus?: string;
+  /** A full inline style for the picture (used for centred crops); replaces `focus`. */
+  imgStyle?: string;
+  shape?: 'rect' | 'circle' | 'oval' | 'chamfer' | 'octagon' | 'step';
+}
+const { photo, caption = '', chapter = '', sizes = '33vw', big = false, mode = 'below', fill = false, shape = 'rect', focus = '', imgStyle = '' } = Astro.props;
+const srcset = `${photo.thumb} ${photo.width}w, ${photo.large} ${photo.lw}w`;
+---
+<button
+  type="button"
+  class:list={['glimpse-tile', `mode-${mode}`, `shape-${shape}`, { fill, crop: !!imgStyle }]}
+  data-large={photo.large}
+  data-n={photo.n}
+  data-caption={caption}
+  data-chapter={chapter}
+  data-o={photo.width >= photo.height ? 'l' : 'p'}
+  aria-label={caption ? `Open photo: ${caption}` : `Open photo ${photo.n}`}
+>
+  <span class="pic"><span class="shade" aria-hidden="true"></span><span class="frame"><span class="mat"><img src={big ? photo.large : photo.thumb} srcset={srcset} sizes={sizes} alt="" width={photo.width} height={photo.height} loading="lazy" decoding="async" style={imgStyle || (focus ? `object-position:${focus}` : undefined)} /></span></span></span>
+  {caption && <span class="cap">{caption}</span>}
+</button>
+
+<style>
+  .glimpse-tile {
+    position: relative;
+    display: block;
+    width: 100%;
+    text-align: left;
+    color: inherit;
+  }
+  .pic {
+    position: relative;
+    display: block;
+  }
+  .shade {
+    display: none;
+    position: absolute;
+    inset: 0;
+    transform: translate(5px, 8px);
+    background: rgb(0 0 0 / 0.3);
+  }
+  .glimpse-tile:not(.shape-rect) .shade {
+    display: block;
+  }
+  .frame {
+    position: relative;
+    display: block;
+    padding: 6px;
+    background: var(--mat, var(--color-cream));
+    box-shadow: 0 22px 30px -22px rgb(0 0 0 / 0.85);
+  }
+  .mat {
+    display: block;
+    overflow: hidden;
+  }
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    transition: transform 0.5s var(--ease-out);
+  }
+  .glimpse-tile:hover img,
+  .glimpse-tile:focus-visible img {
+    transform: scale(1.03);
+  }
+  .crop .mat {
+    position: relative;
+    aspect-ratio: 1;
+  }
+  .fill,
+  .fill .pic,
+  .fill .frame,
+  .fill .mat,
+  .fill img {
+    height: 100%;
+  }
+  .fill img {
+    object-fit: cover;
+  }
+  .cap {
+    font-size: 0.95rem;
+    line-height: 1.4;
+    font-weight: 500;
+  }
+  .mode-below .cap {
+    display: block;
+    margin: 0.85rem auto 0;
+    max-width: 26rem;
+    text-align: center;
+    opacity: 0.9;
+  }
+  /* A solid plate laid over the corner of the print, so the caption never needs a rule or a border. */
+  .mode-overlay .cap {
+    position: absolute;
+    left: 6px;
+    bottom: 6px;
+    max-width: min(80%, 22rem);
+    padding: 0.5rem 0.8rem;
+    background: var(--color-ink);
+    color: var(--color-cream);
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  /* Shaped prints. The mat and the picture share one outline, so the cream mat stays an even thickness.
+     Cut corners use one size on every print (--cut), and each shape keeps the same proportions on every print. */
+  .glimpse-tile:not(.shape-rect) {
+    --cut: clamp(1.1rem, 12%, 2.3rem);
+  }
+  .glimpse-tile:not(.shape-rect) .frame {
+    box-shadow: none;
+  }
+  .shape-circle .frame,
+  .shape-circle .mat,
+  .shape-circle .shade,
+  .shape-oval .frame,
+  .shape-oval .mat,
+  .shape-oval .shade {
+    border-radius: 50%;
+  }
+  .shape-chamfer .frame,
+  .shape-chamfer .mat,
+  .shape-chamfer .shade {
+    clip-path: polygon(var(--cut) 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, var(--cut) 100%, 0 calc(100% - var(--cut)), 0 var(--cut));
+  }
+  .shape-octagon .frame,
+  .shape-octagon .mat,
+  .shape-octagon .shade {
+    --cut: 29%;
+    clip-path: polygon(var(--cut) 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, var(--cut) 100%, 0 calc(100% - var(--cut)), 0 var(--cut));
+  }
+  .shape-step .frame,
+  .shape-step .mat,
+  .shape-step .shade {
+    clip-path: polygon(0 12%, 6% 12%, 6% 6%, 12% 6%, 12% 0, 88% 0, 88% 6%, 94% 6%, 94% 12%, 100% 12%, 100% 88%, 94% 88%, 94% 94%, 88% 94%, 88% 100%, 12% 100%, 12% 94%, 6% 94%, 6% 88%, 0 88%);
+  }
+  .shape-circle img {
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+  .shape-octagon[data-o='p'] img {
+    aspect-ratio: 7 / 8;
+    object-fit: cover;
+  }
+  .shape-octagon[data-o='l'] img {
+    aspect-ratio: 8 / 7;
+    object-fit: cover;
+  }
+  .shape-oval[data-o='p'] img {
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+  }
+  .shape-oval[data-o='l'] img {
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+  }
+  .shape-chamfer[data-o='p'] img,
+  .shape-step[data-o='p'] img {
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+  }
+  .shape-chamfer[data-o='l'] img,
+  .shape-step[data-o='l'] img {
+    aspect-ratio: 5 / 4;
+    object-fit: cover;
+  }
+</style>

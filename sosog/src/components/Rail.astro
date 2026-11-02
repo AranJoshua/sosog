@@ -1,0 +1,125 @@
+---
+import Arrow from './Arrow.astro';
+
+interface Props {
+  title: string;
+  href?: string;
+  hrefLabel?: string;
+  count?: number;
+  /** Keep the heading for screen readers only, where a heading above the rail already names it. */
+  hideTitle?: boolean;
+}
+const { title, href, hrefLabel, count, hideTitle = false } = Astro.props;
+---
+<section class="rail" data-rail aria-label={title}>
+  <div class="gutter flex items-end justify-between gap-6 pb-6">
+    <div class="min-w-0">
+      {hideTitle ? (
+        <h2 class="sr-only">{title}</h2>
+      ) : (
+        <>
+          <h2 class="display-md">{title}</h2>
+          <p class="mt-2 text-[1.02rem] opacity-70" data-rail-count>{count !== undefined ? `${count} ${count === 1 ? 'structure' : 'structures'}` : ''}</p>
+        </>
+      )}
+    </div>
+    <div class="flex shrink-0 items-center gap-6">
+      {href && (
+        <a href={href} class="group hidden items-center gap-3 text-[1rem] font-semibold sm:inline-flex">
+          <span class="link-draw">{hrefLabel ?? 'See all'}</span>
+        </a>
+      )}
+      <div class="flex gap-3" data-rail-buttons>
+        <button type="button" class="nav-arrow" data-prev aria-label={`Scroll ${title} left`}><Arrow dir="left" /></button>
+        <button type="button" class="nav-arrow" data-next aria-label={`Scroll ${title} right`}><Arrow /></button>
+      </div>
+    </div>
+  </div>
+  <ul class="rail-track" data-track tabindex="-1">
+    <slot />
+  </ul>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-rail]').forEach((root) => {
+    const track = root.querySelector<HTMLElement>('[data-track]');
+    const prev = root.querySelector<HTMLButtonElement>('[data-prev]');
+    const next = root.querySelector<HTMLButtonElement>('[data-next]');
+    const label = root.querySelector<HTMLElement>('[data-rail-count]');
+    if (!track) return;
+    const items = Array.from(track.children) as HTMLElement[];
+    const noun = (n: number) => (n === 1 ? 'structure' : 'structures');
+    const isStructures = !!label?.textContent;
+
+    const sync = () => {
+      const max = track.scrollWidth - track.clientWidth;
+      const pos = track.scrollLeft;
+      if (prev) prev.disabled = pos <= 2;
+      if (next) next.disabled = pos >= max - 2;
+      track.style.setProperty('--fade-l', pos > 8 ? '56px' : '0px');
+      track.style.setProperty('--fade-r', pos < max - 8 ? '72px' : '0px');
+      const buttons = root.querySelector<HTMLElement>('[data-rail-buttons]');
+      if (buttons) buttons.style.visibility = max <= 4 ? 'hidden' : '';
+      // Say which structures are in view, since the scrollbar is hidden.
+      if (label && isStructures && items.length) {
+        const box = track.getBoundingClientRect();
+        let first = -1;
+        let last = -1;
+        items.forEach((el, i) => {
+          const r = el.getBoundingClientRect();
+          if (r.right > box.left + 40 && r.left < box.right - 40) {
+            if (first < 0) first = i;
+            last = i;
+          }
+        });
+        if (first >= 0) label.textContent = `${first + 1} to ${last + 1} of ${items.length} ${noun(items.length)}`;
+      }
+    };
+
+    let ticking = false;
+    track.addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        sync();
+        ticking = false;
+      });
+    }, { passive: true });
+    window.addEventListener('resize', sync);
+    sync();
+
+    const step = () => Math.max(240, track.clientWidth * 0.78);
+    prev?.addEventListener('click', () => track.scrollBy({ left: -step(), behavior: 'smooth' }));
+    next?.addEventListener('click', () => track.scrollBy({ left: step(), behavior: 'smooth' }));
+
+    // Grab-to-scroll for a mouse; touch and trackpads already scroll natively.
+    let startX = 0;
+    let startLeft = 0;
+    let down = false;
+    let moved = false;
+    track.addEventListener('pointerdown', (event) => {
+      if (event.pointerType !== 'mouse' || event.button !== 0) return;
+      down = true;
+      moved = false;
+      startX = event.clientX;
+      startLeft = track.scrollLeft;
+    });
+    window.addEventListener('pointermove', (event) => {
+      if (!down) return;
+      const dx = event.clientX - startX;
+      if (!moved && Math.abs(dx) > 6) {
+        moved = true;
+        track.setAttribute('data-dragging', '');
+      }
+      if (moved) track.scrollLeft = startLeft - dx;
+    });
+    const end = () => {
+      if (!down) return;
+      down = false;
+      window.setTimeout(() => track.removeAttribute('data-dragging'), 0);
+    };
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+    track.addEventListener('dragstart', (event) => event.preventDefault());
+  });
+</script>
