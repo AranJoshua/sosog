@@ -1,0 +1,147 @@
+---
+import { getStructurePhoto } from '../lib/photos';
+import { countLabel } from '../lib/text';
+import { interventionLabel } from '../lib/intervention';
+
+interface Entry {
+  id: string;
+  data: {
+    name: string;
+    photo?: string | null;
+    yearBuilt?: string | null;
+    classification?: string | null;
+    materials?: string | null;
+    occupancy?: string | null;
+    interventionLevel?: string | null;
+    history: string | null;
+    technicalDescription: string | null;
+  };
+}
+interface Props {
+  groups: { name: string; slug: string; items: Entry[] }[];
+  field: 'history' | 'technicalDescription';
+  empty: string;
+  /** Tab to open on the structure page. */
+  tab: 'history' | 'technical';
+}
+const { groups, field, empty, tab } = Astro.props;
+const intervention = (s: Entry) => {
+  const label = interventionLabel(s.data.interventionLevel);
+  return label ? `Intervention: ${label}` : null;
+};
+const facts = (s: Entry) => [s.data.yearBuilt, s.data.classification, s.data.materials, s.data.occupancy, intervention(s)].filter(Boolean);
+---
+<div class="mx-auto max-w-[84rem] px-5 pb-8 pt-4 sm:px-8 lg:grid lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:gap-16" data-record-index>
+  <nav aria-label="Municipalities" class="index-nav sticky top-[var(--header-h)] z-30 -mx-5 mb-8 px-5 sm:-mx-8 sm:px-8 lg:top-[calc(var(--header-h)+2.5rem)] lg:z-0 lg:mx-0 lg:mb-0 lg:self-start lg:px-0">
+    <ul class="flex gap-1 overflow-x-auto py-3 lg:flex-col lg:gap-0 lg:overflow-visible lg:py-0" style="scrollbar-width: none">
+      {groups.map((g) => (
+        <li class="shrink-0">
+          <a href={`#${g.slug}`} data-spy={g.slug} class="spy group flex items-center justify-between gap-6 px-3 py-2 text-[1rem] lg:px-0 lg:py-2.5">
+            <span class="spy-name relative"><span class="spy-dash" aria-hidden="true"></span>{g.name}</span>
+            <span class="text-[0.9rem] text-cream/50">{g.items.length}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+
+  <div>
+    {groups.map((g) => (
+      <section id={g.slug} class="pb-16" data-spy-section={g.slug}>
+        <div class="sticky top-[calc(var(--header-h)+3.2rem)] z-20 -mx-5 flex items-baseline justify-between gap-4 border-b-4 border-cream bg-[var(--page-bg)] px-5 pb-3 pt-4 sm:-mx-8 sm:px-8 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pt-0">
+          <h2 class="display-md">{g.name}</h2>
+          <p class="text-[0.98rem] text-cream/60">{countLabel(g.items.length)}</p>
+        </div>
+        {g.items.map((s) => {
+          const photo = getStructurePhoto(s.data.photo ?? s.id, 'thumb');
+          const text = s.data[field];
+          return (
+            <article class="grid gap-6 border-b border-cream/10 py-10 md:grid-cols-[13rem_minmax(0,1fr)] md:gap-10">
+              <a href={`/structures/${s.id}/#${tab}`} data-sp={s.id} class="print group block self-start !w-full max-w-[20rem]" aria-label={`Open ${s.data.name}`} tabindex="-1">
+                <span class="print-frame">
+                  {photo ? <span class="print-img"><img src={photo} alt="" width="480" height="360" loading="lazy" decoding="async" /></span> : <span class="print-empty">No photo available</span>}
+                </span>
+              </a>
+              <div>
+                <h3 class="font-display text-[clamp(1.5rem,2.6vw,2rem)] leading-[1.1]">
+                  <a href={`/structures/${s.id}/#${tab}`} class="group inline-flex items-baseline gap-3"><span class="link-draw">{s.data.name}</span></a>
+                </h3>
+                {facts(s).length > 0 && <p class="mt-2 text-[1rem] text-cream/65">{facts(s).join(', ')}</p>}
+                {text ? <p class="prose-sosog mt-5">{text}</p> : <p class="mt-5 text-cream/65">{empty}</p>}
+                <a href={`/structures/${s.id}/#${tab}`} class="group mt-6 inline-flex items-center gap-3 text-[1rem] font-semibold"><span class="link-draw">Open the full page</span></a>
+              </div>
+            </article>
+          );
+        })}
+      </section>
+    ))}
+  </div>
+</div>
+
+<style>
+  .spy {
+    color: color-mix(in srgb, var(--color-cream) 66%, transparent);
+    transition: color 0.3s;
+  }
+  .spy:hover,
+  .spy[aria-current='true'] {
+    color: var(--color-cream);
+  }
+  .spy-dash {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 0;
+    height: 1px;
+    background: var(--color-cream);
+    transition: width 0.5s var(--ease-out);
+  }
+  @media (min-width: 1024px) {
+    .spy-name {
+      display: block;
+      transition: transform 0.5s var(--ease-out);
+    }
+    .spy[aria-current='true'] .spy-name {
+      transform: translateX(1.9rem);
+    }
+    .spy[aria-current='true'] .spy-dash {
+      width: 1.3rem;
+      left: -1.9rem;
+    }
+  }
+  @media (max-width: 1023px) {
+    .index-nav {
+      background: var(--page-bg);
+    }
+    .spy[aria-current='true'] .spy-dash {
+      width: 100%;
+      left: 0;
+      top: auto;
+      bottom: -6px;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-record-index]').forEach((root) => {
+    const links = Array.from(root.querySelectorAll<HTMLAnchorElement>('[data-spy]'));
+    const sections = Array.from(root.querySelectorAll<HTMLElement>('[data-spy-section]'));
+    const set = (slug: string) => {
+      links.forEach((l) => (l.dataset.spy === slug ? l.setAttribute('aria-current', 'true') : l.removeAttribute('aria-current')));
+      const active = links.find((l) => l.dataset.spy === slug);
+      const scroller = active?.closest('ul');
+      if (active && scroller && scroller.scrollWidth > scroller.clientWidth) {
+        scroller.scrollTo({ left: active.offsetLeft - scroller.clientWidth / 2 + active.offsetWidth / 2, behavior: 'smooth' });
+      }
+    };
+    const io = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) set((visible[0].target as HTMLElement).dataset.spySection!);
+      },
+      { rootMargin: '-30% 0px -60% 0px' }
+    );
+    sections.forEach((s) => io.observe(s));
+    if (sections[0]) set(sections[0].dataset.spySection!);
+  });
+</script>

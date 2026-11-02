@@ -1,0 +1,724 @@
+@import "tailwindcss";
+@import "@fontsource/josefin-sans/latin-300.css";
+@import "@fontsource/josefin-sans/latin-400.css";
+@import "@fontsource/josefin-sans/latin-500.css";
+@import "@fontsource/josefin-sans/latin-600.css";
+@import "@fontsource/josefin-sans/latin-700.css";
+
+/*
+ * Palette from the client's website guide: maroon, cream, navy, ink. Every
+ * other colour on the site is one of these four mixed with another or made
+ * translucent, so nothing sits outside the scheme. Roles:
+ *   maroon  the walls of the site and the colour of memory (History)
+ *   ink     shadow, header, footer, the deepest surfaces
+ *   cream   paper, type, frames
+ *   navy    water and engineering (the map sea, Technical Description)
+ */
+@theme {
+  --color-maroon: #461717;
+  --color-maroon-deep: #371515;
+  --color-maroon-light: #8a2d2d;
+  --color-cream: #f1eace;
+  --color-navy: #2f4461;
+  --color-navy-deep: #243249;
+  --color-ink: #211112;
+
+  --font-display: 'Maragsa', Georgia, 'Times New Roman', serif;
+  /*
+   * The guide asks for Copperplate Gothic for subheadings and body text. That
+   * is a commercial font, so it is not embedded here. Josefin Sans (OFL, free,
+   * self-hosted through @fontsource) stands in; change this one line to swap it.
+   */
+  --font-body: 'Josefin Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-arch: cubic-bezier(0.65, 0, 0.15, 1);
+}
+
+:root {
+  --font-wordmark: var(--font-display);
+  --header-h: 4.5rem;
+  --focus: var(--color-cream);
+  color-scheme: dark;
+
+  /* Plaster grain laid over the walls, and a finer grain for paper. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .92 0 0 0 0 .8 0 0 0 .075 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .27 0 0 0 0 .09 0 0 0 0 .09 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+html {
+  background: var(--color-ink);
+  color: var(--color-cream);
+  font-family: var(--font-body);
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--header-h) + 1.25rem);
+  text-size-adjust: 100%;
+}
+
+body {
+  --page-bg: var(--color-maroon);
+  min-height: 100vh;
+  padding-top: var(--header-h);
+  background-color: var(--page-bg);
+  background-image: var(--grain);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body[data-tone='navy'] {
+  --page-bg: var(--color-navy);
+}
+body[data-tone='cream'] {
+  --page-bg: var(--color-cream);
+}
+body[data-tone='ink'] {
+  --page-bg: var(--color-ink);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+::selection {
+  background: var(--color-cream);
+  color: var(--color-maroon);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Scrollbars: slim, rounded, and in the palette, never the browser's  */
+/* default grey bar.                                                    */
+/* ------------------------------------------------------------------ */
+@supports selector(::-webkit-scrollbar) {
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-ink);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--color-cream) 34%, var(--color-maroon));
+    border: 3px solid var(--color-ink);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--color-cream) 62%, var(--color-maroon));
+  }
+  ::-webkit-scrollbar-corner {
+    background: var(--color-ink);
+  }
+}
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--color-cream) 38%, var(--color-maroon)) var(--color-ink);
+  }
+}
+/* Panels that scroll inside a cream sheet get a paper-toned bar. */
+.paper ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.paper ::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-maroon) 45%, var(--color-cream));
+  border-color: var(--color-cream);
+}
+
+/* ------------------------------------------------------------------ */
+/* Surfaces                                                             */
+/* ------------------------------------------------------------------ */
+.wall-maroon {
+  background-color: var(--color-maroon);
+  background-image: var(--grain);
+}
+.wall-deep {
+  background-color: var(--color-maroon-deep);
+  background-image: var(--grain);
+}
+.wall-ink {
+  background-color: var(--color-ink);
+  background-image: var(--grain);
+}
+.wall-navy {
+  background-color: var(--color-navy-deep);
+  background-image: var(--grain);
+}
+.wall-navy-mid {
+  background-color: var(--color-navy);
+  background-image: var(--grain);
+}
+.wall-cream,
+.paper {
+  --focus: var(--color-maroon);
+  background-color: var(--color-cream);
+  background-image: var(--paper-grain);
+  color: var(--color-maroon);
+}
+
+/* Horizontal padding that lines content up with the 80rem column while letting scrollers run to the screen edge. */
+.gutter {
+  padding-inline: max(1.25rem, calc((100% - 80rem) / 2 + 1.25rem));
+}
+.column {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Type                                                                 */
+/* ------------------------------------------------------------------ */
+.display-xl {
+  font-family: var(--font-display);
+  font-size: clamp(3.1rem, 9vw, 8.5rem);
+  line-height: 0.92;
+}
+.display-lg {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 5.6vw, 4.75rem);
+  line-height: 1;
+}
+.display-md {
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 3.4vw, 2.75rem);
+  line-height: 1.08;
+}
+.lead {
+  font-size: clamp(1.08rem, 1.5vw, 1.3rem);
+  line-height: 1.6;
+  font-weight: 400;
+  max-width: 44rem;
+}
+/* Small caption type. Used for tiny captions only, never to introduce a heading. */
+.caption {
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.prose-sosog {
+  max-width: 62ch;
+  line-height: 1.9;
+  font-size: 1.14rem;
+  font-weight: 400;
+  white-space: pre-line;
+}
+
+/* Underline that draws in from the left and leaves to the right. */
+.link-draw {
+  background: linear-gradient(currentColor, currentColor) right bottom / 0 2px no-repeat;
+  padding-bottom: 2px;
+  transition: background-size 0.3s ease-out;
+}
+.link-draw:hover,
+.link-draw:focus-visible,
+a:hover > .link-draw,
+a:focus-visible > .link-draw,
+.group:hover .link-draw,
+.group:focus-visible .link-draw {
+  background-position: left bottom;
+  background-size: 100% 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Arrow: a wrought-iron gate spear, drawn solid. On hover it nudges a   */
+/* few pixels the way it points; it never swaps or slides out.           */
+/* ------------------------------------------------------------------ */
+.arr {
+  position: relative;
+  display: inline-grid;
+  width: 2.2em;
+  height: 1em;
+  flex: none;
+  vertical-align: middle;
+}
+.arr svg {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  transition: transform 0.25s var(--ease-out);
+}
+/* Older markup carries a second copy of the arrow; only the first is drawn. */
+.arr svg + svg {
+  display: none;
+}
+.arr[data-dir='left'] svg {
+  transform: scaleX(-1);
+}
+.arr[data-dir='down'] {
+  width: 1em;
+  height: 2.2em;
+}
+.arr[data-dir='down'] svg {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2.2em;
+  height: 1em;
+  margin: -0.5em 0 0 -1.1em;
+  transform: rotate(90deg);
+}
+:is(a, button):not(:disabled):is(:hover, :focus-visible) .arr svg:first-child {
+  transform: translateX(4px);
+}
+:is(a, button):not(:disabled):is(:hover, :focus-visible) .arr[data-dir='left'] svg:first-child {
+  transform: scaleX(-1) translateX(4px);
+}
+:is(a, button):not(:disabled):is(:hover, :focus-visible) .arr[data-dir='down'] svg:first-child {
+  transform: rotate(90deg) translateX(4px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Buttons: solid blocks; a darker block rises behind the label          */
+/* ------------------------------------------------------------------ */
+.btn {
+  --bg: var(--color-cream);
+  --fg: var(--color-maroon);
+  --fill: var(--color-ink);
+  --fill-fg: var(--color-cream);
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 13rem;
+  padding: 1.2rem 2.6rem;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: center;
+  line-height: 1.15;
+  overflow: hidden;
+  /* A second, offset frame around the button, like the stepped surround of a doorway; it draws in on hover. */
+  outline: 4px solid var(--bg);
+  outline-offset: 5px;
+  transition: color 0.3s ease-out;
+}
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--fill);
+  transform: translateY(101%);
+  transition: transform 0.3s ease-out;
+}
+.btn:hover,
+.btn:focus-visible {
+  color: var(--fill-fg);
+}
+.btn:hover::before,
+.btn:focus-visible::before {
+  transform: none;
+}
+.btn-sm {
+  min-width: 0;
+  padding: 0.85rem 1.4rem;
+  font-size: 0.98rem;
+  outline-width: 3px;
+  outline-offset: 3px;
+}
+.btn-navy {
+  --bg: var(--color-navy);
+  --fg: var(--color-cream);
+  --fill: var(--color-cream);
+  --fill-fg: var(--color-maroon);
+}
+.btn-maroon {
+  --bg: var(--color-maroon);
+  --fg: var(--color-cream);
+  --fill: var(--color-ink);
+  --fill-fg: var(--color-cream);
+}
+.btn-ink {
+  --bg: var(--color-ink);
+  --fg: var(--color-cream);
+  --fill: var(--color-cream);
+  --fill-fg: var(--color-maroon);
+}
+/* Figures (numbers) are set in the body face because Maragsa only has old-style numerals, which makes 4, 7, and 9 hang below the line. */
+.figure {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: -0.01em;
+}
+/* Arrow-only control for rails and viewers. */
+.nav-arrow {
+  display: grid;
+  place-items: center;
+  padding: 0.7rem 0.4rem;
+  color: inherit;
+  font-size: 1.35rem;
+  transition: opacity 0.2s;
+}
+.nav-arrow:disabled {
+  opacity: 0.22;
+  cursor: default;
+}
+
+/* ------------------------------------------------------------------ */
+/* Rails: horizontal rows with a drawn progress rule instead of a bar    */
+/* ------------------------------------------------------------------ */
+.rail-track {
+  display: flex;
+  gap: 1.5rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: max(1.25rem, calc((100vw - 80rem) / 2 + 1.25rem));
+  padding-inline: max(1.25rem, calc((100vw - 80rem) / 2 + 1.25rem));
+  padding-block: 0.5rem 1.5rem;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade-r, 0px)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade-r, 0px)), transparent 100%);
+  cursor: grab;
+}
+.rail-track::-webkit-scrollbar {
+  display: none;
+}
+.rail-track[data-dragging] {
+  cursor: grabbing;
+  scroll-snap-type: none;
+}
+.rail-track[data-dragging] a,
+.rail-track[data-dragging] button {
+  pointer-events: none;
+}
+.rail-track > li {
+  flex: none;
+  scroll-snap-align: start;
+}
+/* ------------------------------------------------------------------ */
+/* Prints: framed photographs with a caption beneath                     */
+/* ------------------------------------------------------------------ */
+.print {
+  display: block;
+  width: 17rem;
+}
+.print-frame {
+  display: block;
+  padding: 6px;
+  background: var(--color-cream);
+  box-shadow: 0 22px 30px -22px rgb(0 0 0 / 0.85);
+  overflow: hidden;
+}
+.print-frame > .print-img {
+  display: block;
+  overflow: hidden;
+}
+.print-frame img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  transition: transform 0.6s var(--ease-out);
+}
+.print:hover .print-frame img,
+.print:focus-visible .print-frame img {
+  transform: scale(1.04);
+}
+.print-empty {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  background: var(--color-navy);
+  color: color-mix(in srgb, var(--color-cream) 65%, transparent);
+  font-size: 0.85rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Page transitions (native, no script): the header stays put while the */
+/* page beneath it dissolves and rises, and the cream tab plate glides   */
+/* from the tab you left to the tab you chose.                           */
+/* ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+  .site-header {
+    view-transition-name: site-header;
+  }
+  ::view-transition-group(site-header) {
+    animation: none;
+  }
+  /* The old page stays put and the new one fades in over it while rising 10 px. Fading both at once would dip the page to half brightness midway, so the old one does not fade; plain blending (not the default additive one) keeps the two from adding up to a flash. The shifted top edge sits under the fixed header, so no gap shows. */
+  ::view-transition-old(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+  ::view-transition-new(root) {
+    animation: 280ms var(--ease-out) both vt-rise;
+    mix-blend-mode: normal;
+  }
+  /* The plate is carried across, 380 ms, while the two labels trade places inside it at their natural size (a stretched label would look smeared). */
+  ::view-transition-group(nav-tab) {
+    animation-duration: 380ms;
+    animation-timing-function: var(--ease-out);
+    overflow: clip;
+    border-radius: 999px 999px 0 0;
+    background: var(--color-cream);
+  }
+  ::view-transition-old(nav-tab),
+  ::view-transition-new(nav-tab) {
+    inset: 0 auto auto 50%;
+    width: auto;
+    height: 100%;
+    translate: -50% 0;
+    mix-blend-mode: normal;
+  }
+  ::view-transition-old(nav-tab) {
+    animation: 150ms ease-in both vt-out;
+  }
+  ::view-transition-new(nav-tab) {
+    animation: 220ms ease-out 130ms both vt-in;
+  }
+  /* Same-page morphs (the photo viewer): the whole page, header included, dims or brightens in step with the photo, so the header never floats over the viewer. */
+  html[data-vt] .site-header {
+    view-transition-name: none;
+  }
+  html[data-vt]::view-transition-new(root) {
+    animation: 300ms ease-out both vt-in;
+  }
+  html[data-vt]::view-transition-group(glimpse) {
+    animation-duration: 460ms;
+    animation-timing-function: var(--ease-out);
+  }
+  ::view-transition-group(sp-hero) {
+    animation-duration: 650ms;
+    animation-timing-function: var(--ease-out);
+  }
+  @keyframes vt-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes vt-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes vt-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Map                                                                  */
+/* ------------------------------------------------------------------ */
+.muni-path {
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.4s var(--ease-out), fill-opacity 0.25s, stroke-opacity 0.25s, filter 0.3s;
+}
+.muni-path:focus-visible {
+  stroke: var(--color-maroon-light);
+  stroke-opacity: 1;
+}
+.pin {
+  cursor: pointer;
+  outline: none;
+  transform-box: fill-box;
+  transform-origin: 50% 85%;
+  animation: pin-in 0.45s var(--ease-out) both;
+  animation-delay: var(--d, 0s);
+  transition: transform 0.35s var(--ease-out);
+}
+.pin:hover,
+.pin:focus-visible {
+  transform: scale(1.14);
+}
+.pin:focus-visible circle:first-of-type {
+  stroke: var(--color-maroon-light);
+}
+@keyframes pin-in {
+  from {
+    opacity: 0;
+    transform: translateY(-22px) scale(0.5);
+  }
+}
+.pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse 1.1s var(--ease-out) 1 both;
+}
+@keyframes pulse {
+  from {
+    opacity: 0.7;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.1);
+  }
+}
+.popup-in {
+  animation: popup-in 0.3s ease-out both;
+}
+@keyframes popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+}
+.map-tip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 20;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+/* The popup is a heritage marker: a cast plate with rivets and an arched photograph. */
+.marker-plate {
+  background-color: var(--color-maroon);
+  --focus: var(--color-cream);
+  background-image: var(--grain);
+}
+.marker-photo {
+  aspect-ratio: 4 / 3;
+  padding: 6px;
+  background: var(--color-cream);
+  overflow: hidden;
+}
+.marker-plate:focus-visible {
+  outline: none;
+}
+.rivet {
+  position: absolute;
+  z-index: 2;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--color-cream), color-mix(in srgb, var(--color-cream) 45%, var(--color-maroon)) 62%, var(--color-ink) 100%);
+  box-shadow: 0 2px 3px rgb(0 0 0 / 0.55);
+}
+/* Province index: each row carries a solid bar for its count. */
+.idx-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.6rem 0.4rem;
+  font-size: 1.03rem;
+  color: color-mix(in srgb, var(--color-cream) 90%, transparent);
+  transition: color 0.3s, background-color 0.3s, padding-left 0.5s var(--ease-out);
+}
+.idx-row:hover,
+.idx-row:focus-visible {
+  color: var(--color-cream);
+  background: color-mix(in srgb, var(--color-cream) 12%, transparent);
+  padding-left: 0.9rem;
+}
+.idx-track {
+  flex: 1;
+  height: 0.7rem;
+  background: color-mix(in srgb, var(--color-cream) 10%, transparent);
+}
+.idx-bar {
+  display: block;
+  height: 100%;
+  background: var(--color-cream);
+  transition: width 0.8s var(--ease-out);
+}
+
+/* A panel that swaps in (the map's side panel, a tab's sheet) arrives with a short fade and a small rise. */
+.panel-in {
+  animation: panel-in 0.28s ease-out both;
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-in {
+    animation: none;
+  }
+}
+
+/* Map popup: the scrollbar's width is reserved on both edges, so the photo keeps equal space left and right in any browser. */
+.popup-body {
+  scrollbar-gutter: stable both-edges;
+  padding-inline: 0.5rem;
+}
+
+/* Popup: while more of the card is below the fold, its lower edge fades out. */
+.popup-body[data-more] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.25rem), transparent);
+}
+
+/* Map key: a plain plus that turns into a minus, in place of the browser's disclosure triangle. */
+.key-summary {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.75rem;
+  list-style: none;
+}
+.key-summary::-webkit-details-marker {
+  display: none;
+}
+.key-mark {
+  position: relative;
+  flex: none;
+  width: 1.35rem;
+  height: 1.35rem;
+  background: color-mix(in srgb, var(--color-cream) 18%, transparent);
+}
+.key-mark::before,
+.key-mark::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: var(--color-cream);
+  transform: translate(-50%, -50%);
+}
+.key-mark::before {
+  width: 0.7rem;
+  height: 2px;
+}
+.key-mark::after {
+  width: 2px;
+  height: 0.7rem;
+  transition: transform 0.25s var(--ease-out);
+}
+details[open] > .key-summary .key-mark::after {
+  transform: translate(-50%, -50%) scaleY(0);
+}

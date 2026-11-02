@@ -1,0 +1,869 @@
+---
+import path from 'node:path';
+import Layout from '../layouts/Layout.astro';
+import Arrow from '../components/Arrow.astro';
+import HeaderStats from '../components/HeaderStats.astro';
+import GlimpseTile from '../components/GlimpseTile.astro';
+import { getGlimpsePhotos, jpegSize } from '../lib/photos';
+import { GLIMPSE_CHAPTERS, GLIMPSE_HEADER_PHOTO, type GlimpseWall } from '../data/glimpse';
+
+const measure = (url: string) => jpegSize(path.resolve('public', url.replace(/^\//, '')));
+const all = getGlimpsePhotos().map((p) => {
+  const t = measure(p.thumb) ?? { width: 360, height: 480 };
+  const l = measure(p.large) ?? { width: t.width * 3, height: t.height * 3 };
+  return { ...p, width: t.width, height: t.height, lw: l.width };
+});
+type Photo = (typeof all)[number];
+const byNumber = new Map(all.map((p) => [p.n, p]));
+
+interface Stop {
+  id: string;
+  title: string;
+  intro: string;
+  wall: GlimpseWall;
+  items: { photo: Photo; caption: string; focus?: string; crop?: { x: number; y: number; zoom: number } }[];
+}
+const used = new Set<number>();
+const stops: Stop[] = GLIMPSE_CHAPTERS.map((c) => ({
+  id: c.id,
+  title: c.title,
+  intro: c.intro,
+  wall: c.wall,
+  items: c.photos.flatMap((e) => {
+    const photo = byNumber.get(e.n);
+    if (!photo) return [];
+    used.add(e.n);
+    return [{ photo, caption: e.caption, focus: e.focus, crop: e.crop }];
+  })
+})).filter((c) => c.items.length > 0);
+const rest = all.filter((p) => !used.has(p.n));
+if (rest.length > 0) stops.push({ id: 'more', title: 'More from the road', intro: 'More photographs from the road.', wall: 'ink', items: rest.map((photo) => ({ photo, caption: '' })) });
+
+// Each stop has one shape family, tied to what it holds, so a stop reads as one set and the page as a family of sets.
+const FAMILY: Record<string, 'chamfer' | 'oval' | 'octagon' | 'circle' | 'step'> = {
+  stone: 'chamfer', // cut corners, like dressed masonry
+  within: 'oval', // cameo frames, like a salon wall
+  'along-the-way': 'octagon', // road signs
+  shore: 'circle', // portholes
+  light: 'circle', // the sun
+  'after-dark': 'circle', // lamps
+  'small-things': 'step' // stepped corners, like collector's cards
+};
+const shaped = (stopId: string, items: Stop['items']) => items.map((it) => ({ ...it, shape: FAMILY[stopId] ?? 'chamfer' }));
+type Shaped = ReturnType<typeof shaped>[number];
+
+// Inline style that puts a chosen point of a photo at the centre of a square or round crop, zoomed in. The picture keeps its full
+// proportions (no cover crop) and the round frame around it does the clipping.
+const cropStyle = (s: Shaped) => {
+  if (!s.crop) return undefined;
+  const { x, y, zoom } = s.crop;
+  const { width: w, height: h } = s.photo;
+  const tx = (0.5 / Math.max(1, w / h) - zoom * x) * 100;
+  const ty = (0.5 / Math.max(1, h / w) - zoom * y) * 100;
+  return `position:absolute;left:0;top:0;width:100%;height:auto;max-width:none;aspect-ratio:auto;object-fit:fill;transform-origin:0 0;transform:translate(${tx.toFixed(2)}%, ${ty.toFixed(2)}%) scale(${zoom})`;
+};
+
+// Within a side the prints are set in rows. A side opens with one wide print on its own, then prints of the same orientation are
+// paired, so the two in a row always match in height. A print left over stands alone, centred.
+const rowsOf = (list: Shaped[]) => {
+  const wide = list.filter((i) => i.photo.width >= i.photo.height);
+  const tall = list.filter((i) => i.photo.width < i.photo.height);
+  const rows: { pat: 'hero' | 'pair' | 'solo'; items: Shaped[] }[] = [];
+  const lead = wide.shift();
+  if (lead) rows.push({ pat: 'hero', items: [lead] });
+  while (wide.length > 1 || tall.length > 1) {
+    if (tall.length > 1) rows.push({ pat: 'pair', items: [tall.shift()!, tall.shift()!] });
+    if (wide.length > 1) rows.push({ pat: 'pair', items: [wide.shift()!, wide.shift()!] });
+  }
+  [...tall, ...wide].forEach((it) => rows.push({ pat: 'solo', items: [it] }));
+  return rows;
+};
+
+// Height of a side in units of its width: each print's proportions, its caption, and the gap below it.
+const ratioOf = (it: Shaped) => {
+  const tall = it.photo.width < it.photo.height;
+  if (it.shape === 'circle') return 1;
+  if (it.shape === 'octagon') return tall ? 8 / 7 : 7 / 8;
+  if (it.shape === 'oval') return tall ? 4 / 3 : 3 / 4;
+  return tall ? 5 / 4 : 4 / 5;
+};
+const heightOf = (list: Shaped[]) =>
+  rowsOf(list).reduce((sum, row) => sum + row.items.reduce((m, it) => Math.max(m, ratioOf(it)), 0) * (row.pat === 'hero' ? 1 : row.pat === 'pair' ? 0.48 : 0.64) + 0.27, 0);
+// Choose which prints go on which side of the road so the two sides come out the same height.
+const split = (list: Shaped[], headBase: number, otherBase: number) => {
+  if (list.length === 0) return { head: [] as Shaped[], other: [] as Shaped[] };
+  if (list.length > 14) {
+    const head = list.filter((_, i) => i % 2 === 0);
+    return { head, other: list.filter((_, i) => i % 2 === 1) };
+  }
+  let best = { score: Infinity, head: [] as Shaped[], other: [] as Shaped[] };
+  for (let mask = 0; mask < 1 << list.length; mask++) {
+    const head = list.filter((_, i) => mask & (1 << i));
+    const other = list.filter((_, i) => !(mask & (1 << i)));
+    const score = Math.abs(headBase + heightOf(head) - (otherBase + heightOf(other))) + Math.abs(head.length - other.length) * 0.01;
+    if (score < best.score) best = { score, head, other };
+  }
+  return best;
+};
+
+// One solid icon per stop on a 48 grid. Paint marked "c" is cut out in cream. Where shapes of one path overlap they must be drawn in the same direction (clockwise), or the overlap is knocked out.
+const ICONS: Record<string, string> = {
+  stone: '<path d="M5 44V27l10-6v-9h6V8l3-6 3 6v4h6v9l10 6v17z"/><rect class="c" x="20" y="31" width="8" height="13"/><rect class="c" x="9" y="31" width="5" height="8"/><rect class="c" x="34" y="31" width="5" height="8"/><rect class="c" x="22" y="15" width="4" height="7"/>',
+  within: '<path d="M5 44V35h9v-9h9v-9h9v-9h11v36z"/>',
+  'along-the-way': '<path d="M22 3h4v42h-4zM8 8h26l6 6-6 6H8zM14 24h26v12H14l-6-6zM15 43h18v3H15z"/>',
+  shore: '<path d="M23 3h2v28h-2zM27 6c9 5 13 14 13 23H27zM21 11v18H9c0-9 4-14 12-18zM5 33h38l-6 7H11zM2 43q5-5 10 0t10 0t10 0t10 0t6 0V48H2z"/>',
+  light: '<path d="M13 32a11 11 0 0 1 22 0z"/><path d="M22.8 6h2.4l-.6 9h-1.2z" transform="rotate(-60 24 32)"/><path d="M22.8 6h2.4l-.6 9h-1.2z" transform="rotate(-30 24 32)"/><path d="M22.8 6h2.4l-.6 9h-1.2z"/><path d="M22.8 6h2.4l-.6 9h-1.2z" transform="rotate(30 24 32)"/><path d="M22.8 6h2.4l-.6 9h-1.2z" transform="rotate(60 24 32)"/><path d="M2 30h8v2.4H2zM38 30h8v2.4h-8zM2 36h44v3H2zM9 42h30v3H9z"/>',
+  'after-dark': '<path fill-rule="evenodd" d="M24 4a17 17 0 1 1 0 34 17 17 0 0 1 0-34zm0 3.5a13.5 13.5 0 1 0 0 27 13.5 13.5 0 0 0 0-27z"/><path d="M23.2 8h1.6v26h-1.6z"/><path d="M23.2 8h1.6v26h-1.6z" transform="rotate(45 24 21)"/><path d="M23.2 8h1.6v26h-1.6z" transform="rotate(90 24 21)"/><path d="M23.2 8h1.6v26h-1.6z" transform="rotate(135 24 21)"/><circle cx="24" cy="21" r="3.2"/><path d="M24 21l-12 26h4.5l7.5-16 7.5 16H36z"/>',
+  'small-things': '<circle cx="24" cy="24" r="19"/><path fill="none" stroke-linecap="round" style="stroke:var(--color-cream)" stroke-width="3" d="M24 24a2.2 2.2 0 0 1 4.4 0a5.5 5.5 0 0 1-11 0a9.5 9.5 0 0 1 19 0a13.5 13.5 0 0 1-27 0"/>',
+  more: '<path d="M6 6h14v14H6zM28 6h14v14H28zM6 28h14v14H6zM28 28h14v14H28z"/>'
+};
+
+// Ferris wheel drawing: rim lights and spokes, in a 100 by 134 box with the hub at 50,50.
+const LIGHTS = Array.from({ length: 24 }, (_, i) => {
+  const a = (i * 15 * Math.PI) / 180;
+  return { x: +(50 + 38 * Math.sin(a)).toFixed(2), y: +(50 - 38 * Math.cos(a)).toFixed(2) };
+});
+const SPOKES = Array.from({ length: 8 }, (_, i) => i * 22.5);
+
+const number = (i: number) => String(i + 1).padStart(2, '0');
+const header = byNumber.get(GLIMPSE_HEADER_PHOTO) ?? all[0];
+---
+<Layout title="Glimpse of Sorsogon" tone="ink">
+  <main id="main" class="wall-ink">
+    <!-- Opening: a sun disc with the evening photograph set in it, rays behind -->
+    <header class="mx-auto grid max-w-[84rem] items-center gap-14 overflow-x-clip px-5 pb-14 pt-14 sm:px-8 sm:pb-20 sm:pt-20 lg:grid-cols-[1.05fr_0.95fr]">
+      <div>
+        <h1 class="display-lg">Glimpse of Sorsogon</h1>
+        <p class="lead mt-6 max-w-[32rem]">Photographs from the field work across the province, laid out as a road with one stop for each kind of thing the camera found.</p>
+        <div class="mt-10"><HeaderStats items={[{ n: all.length, label: 'photographs' }, { n: stops.length, label: 'stops' }]} /></div>
+      </div>
+      {header && (
+        <div class="sun" aria-hidden="true">
+          <div class="rays"></div>
+          <div class="disc"><img src={header.large} srcset={`${header.thumb} ${header.width}w, ${header.large} ${header.lw}w`} sizes="30rem" alt="" width={header.width} height={header.height} loading="eager" decoding="async" /></div>
+        </div>
+      )}
+    </header>
+
+    <nav class="mx-auto max-w-[84rem] px-5 pb-20 sm:px-8" aria-label="Stops on the road">
+      <ul class="flex flex-wrap gap-x-5 gap-y-6">
+        {stops.map((c, i) => (
+          <li><a href={`#${c.id}`} class="btn btn-sm"><span class="figure mr-2.5">{number(i)}</span>{c.title}</a></li>
+        ))}
+      </ul>
+    </nav>
+
+    <!-- The road: the line is drawn by script from the position of each stop's sign; without script the stops simply stack -->
+    <div class="trip" data-trip>
+      <svg class="road" aria-hidden="true" focusable="false">
+        <path class="road-shoulder" data-road />
+        <path class="road-asphalt" data-road />
+        <path class="road-dash" data-road />
+        <g class="jeep" data-jeep>
+          <rect class="j-body" x="-30" y="-14" width="60" height="28" rx="6" />
+          <rect class="j-roof" x="-25" y="-11" width="36" height="22" rx="3" />
+          <rect class="j-rack" x="-22" y="-8" width="30" height="16" rx="2" />
+          <path class="j-glass" d="M14 -11L24 -9V9L14 11z" />
+          <circle class="j-lamp" cx="29" cy="-9" r="2.4" />
+          <circle class="j-lamp" cx="29" cy="9" r="2.4" />
+        </g>
+      </svg>
+
+      {stops.map((c, ci) => {
+        const items = shaped(c.id, c.items);
+        const hasScrub = c.id === 'light' && items.length >= 4;
+        const hasWheel = c.id === 'after-dark' && items.length >= 3;
+        const feature = hasScrub || hasWheel;
+        const scrub = hasScrub ? items.slice(0, 4) : [];
+        const wheel = hasWheel ? items : [];
+        const loose = hasScrub ? items.slice(4) : hasWheel ? [] : items;
+        // The heading takes the side that alternates from stop to stop; the other side carries the scrubber or the wheel, if there is one.
+        const headRight = ci % 2 === 0;
+        const { head: headList, other: otherList } = split(loose, 0.62, hasScrub ? 1.45 : 0.1);
+        const run = (list: Shaped[]) => (
+          <div class="run">
+            {rowsOf(list).map((row) => (
+              <div class={`row row-${row.pat}`}>
+                {row.items.map(({ photo, caption, shape, focus }) => (
+                  <div class="cell">
+                    <GlimpseTile photo={photo} caption={caption} chapter={c.title} shape={shape} focus={focus} big sizes="(min-width: 861px) 22vw, 45vw" />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        );
+        const head = (
+          <div class="head">
+            <p class="stop-no figure">{number(ci)}</p>
+            <h2 id={`${c.id}-title`} class="display-md">{c.title}</h2>
+            <p class="lead mt-4 max-w-[30rem] opacity-90">{c.intro}</p>
+          </div>
+        );
+        const scrubber = hasScrub && (
+          <div class="scrub" data-scrub>
+            <div class="scrub-view">
+              {scrub.map((s, i) => (
+                <img src={s.photo.large} srcset={`${s.photo.thumb} ${s.photo.width}w, ${s.photo.large} ${s.photo.lw}w`} sizes="26rem" alt={s.caption} width={s.photo.width} height={s.photo.height} loading="lazy" decoding="async" data-frame={i} data-on={i === 0 ? '' : undefined} data-caption={s.caption} />
+              ))}
+            </div>
+            <label class="scrub-label" for="sun-range">Slide the sun through four frames</label>
+            <input id="sun-range" class="scrub-range" type="range" min="0" max={scrub.length - 1} step="1" value="0" />
+            <p class="scrub-cap" aria-live="polite" data-scrub-cap>{scrub[0].caption}</p>
+            <p class="scrub-note">All four carry the same date stamp.</p>
+          </div>
+        );
+        const panel = hasWheel && (
+          <div class="wv">
+            <button type="button" class="wv-disc" data-wheel-open aria-label="Open this photograph larger">
+              <span class="wv-frames">
+              {wheel.map((s, i) => (
+                <img src={s.photo.large} srcset={`${s.photo.thumb} ${s.photo.width}w, ${s.photo.large} ${s.photo.lw}w`} sizes="26rem" alt="" width={s.photo.width} height={s.photo.height} loading="lazy" decoding="async" data-wframe={i} data-on={i === 0 ? '' : undefined} data-caption={s.caption} style={cropStyle(s) ?? (s.focus ? `object-position:${s.focus}` : undefined)} />
+              ))}
+              </span>
+            </button>
+            <p class="wv-cap" aria-live="polite" data-wheel-cap>{wheel[0].caption}</p>
+            <div class="wv-controls">
+              <button type="button" class="nav-arrow" data-wheel-prev aria-label="Previous cabin"><Arrow dir="left" /></button>
+              <p class="wv-count figure" data-wheel-count>1 of {wheel.length}</p>
+              <button type="button" class="nav-arrow" data-wheel-next aria-label="Next cabin"><Arrow /></button>
+            </div>
+            <p class="wv-hint">Drag the wheel, use the arrows, or press a cabin.</p>
+          </div>
+        );
+        const wheelArt = hasWheel && (
+          <div class="wheel" data-wheel tabindex="0" role="group" aria-label="Ferris wheel of night photographs. Drag it, or use the left and right arrow keys.">
+            <svg class="wheel-art" viewBox="0 0 100 134" aria-hidden="true" focusable="false">
+              <polygon class="w-leg" points="46.5,50 53.5,50 27,124 16,124" />
+              <polygon class="w-leg" points="46.5,50 53.5,50 84,124 73,124" />
+              <rect class="w-ground" x="6" y="122" width="88" height="7" rx="2" />
+              <g data-rotor>
+                <circle class="w-rim" cx="50" cy="50" r="38" />
+                <circle class="w-rim w-rim-in" cx="50" cy="50" r="22" />
+                {SPOKES.map((a) => <rect class="w-spoke" x="49.4" y="12" width="1.2" height="76" transform={`rotate(${a} 50 50)`} />)}
+                {LIGHTS.map((l) => <circle class="w-light" cx={l.x} cy={l.y} r="1.35" />)}
+              </g>
+              <circle class="w-hub" cx="50" cy="50" r="6" />
+              <circle class="w-hub-in" cx="50" cy="50" r="2.4" />
+            </svg>
+            {wheel.map((s, i) => (
+              <div class="cab" data-cab={i}>
+                <GlimpseTile photo={s.photo} caption={s.caption} chapter={c.title} shape="circle" focus={s.focus} imgStyle={cropStyle(s)} sizes="12rem" />
+              </div>
+            ))}
+          </div>
+        );
+        const headSide = [head, panel, loose.length > 0 && headList.length > 0 && run(headList)];
+        const otherSide = [scrubber, wheelArt, otherList.length > 0 && run(otherList)];
+        const left = headRight ? otherSide : headSide;
+        const right = headRight ? headSide : otherSide;
+        return (
+          <section id={c.id} class={`stop wall-${c.wall}`} aria-labelledby={`${c.id}-title`}>
+            <div class="stop-in">
+              <span class="sign" data-sign aria-hidden="true">
+                <svg viewBox="0 0 48 48" set:html={ICONS[c.id] ?? ICONS.more} />
+              </span>
+              <div class="side side-l" data-heading={!headRight ? '' : undefined} data-feature={feature && headRight ? '' : undefined}>{left}</div>
+              <div class="side side-r" data-heading={headRight ? '' : undefined} data-feature={feature && !headRight ? '' : undefined}>{right}</div>
+            </div>
+          </section>
+        );
+      })}
+    </div>
+
+    {all.length === 0 && <p class="mx-auto max-w-[84rem] px-5 pb-24 text-[1.1rem] text-cream/70 sm:px-8">Photos are on the way.</p>}
+
+    <dialog id="glimpse-dialog" class="viewer" aria-label="Photo viewer">
+      <div class="viewer-stage">
+        <img id="glimpse-large" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" />
+      </div>
+      <button type="button" id="glimpse-close" class="btn btn-sm viewer-close" aria-label="Close viewer">Close</button>
+      <button type="button" id="glimpse-prev" class="nav-arrow viewer-prev" aria-label="Previous photo"><Arrow dir="left" /></button>
+      <button type="button" id="glimpse-next" class="nav-arrow viewer-next" aria-label="Next photo"><Arrow /></button>
+      <div class="viewer-info">
+        <p id="glimpse-caption" class="viewer-caption"></p>
+        <p id="glimpse-count" class="viewer-count" aria-live="polite"></p>
+      </div>
+    </dialog>
+  </main>
+</Layout>
+
+<style>
+  /* ---------- opening: sun disc ---------- */
+  .sun { position: relative; width: min(100%, 30rem); aspect-ratio: 1; justify-self: center; }
+  .rays {
+    position: absolute; inset: -12%; border-radius: 50%;
+    background: repeating-conic-gradient(var(--color-maroon) 0 6deg, transparent 6deg 12deg);
+    mask: radial-gradient(circle, transparent 46%, #000 47%);
+    -webkit-mask: radial-gradient(circle, transparent 46%, #000 47%);
+  }
+  .disc { position: absolute; inset: 8%; border-radius: 50%; padding: 0.8rem; background: var(--color-cream); }
+  .disc img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+
+  /* ---------- the road ---------- */
+  .trip { position: relative; }
+  .road { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: visible; display: none; }
+  :global(html.js) .road { display: block; }
+  .road-shoulder { fill: none; stroke: var(--color-cream); stroke-width: 62px; }
+  .road-asphalt { fill: none; stroke: var(--color-ink); stroke-width: 46px; }
+  .road-dash { fill: none; stroke: var(--color-cream); stroke-width: 5px; stroke-dasharray: 18 20; }
+  .j-body { fill: var(--color-maroon-light); }
+  .j-roof, .j-lamp { fill: var(--color-cream); }
+  .j-rack, .j-glass { fill: var(--color-navy); }
+  .jeep { filter: drop-shadow(0 4px 3px rgb(0 0 0 / 0.5)); }
+
+  .stop { position: relative; padding-block: clamp(4.5rem, 8vw, 7rem); }
+  .stop.wall-cream { --mat: var(--color-maroon); }
+  .stop:not(.wall-cream) { --mat: var(--color-cream); }
+  .stop-in {
+    margin-inline: auto; max-width: 84rem; padding-inline: 1.25rem;
+    display: grid; grid-template-columns: minmax(0, 1fr) 13rem minmax(0, 1fr); align-items: start;
+  }
+  @media (min-width: 640px) { .stop-in { padding-inline: 2rem; } }
+  @media (max-width: 1180px) { .stop-in { grid-template-columns: minmax(0, 1fr) 9.5rem minmax(0, 1fr); } }
+  .sign {
+    grid-column: 2; grid-row: 1; justify-self: center; position: relative; z-index: 3;
+    display: grid; place-items: center; width: 5.2rem; height: 5.2rem; border-radius: 50%;
+    background: var(--color-cream); color: var(--color-maroon); box-shadow: 0 0 0 0.55rem var(--color-ink);
+  }
+  .sign svg { width: 3.1rem; height: 3.1rem; fill: currentColor; }
+  .sign :global(.c) { fill: var(--color-cream); }
+  .side { grid-row: 1; min-width: 0; padding-top: 0.4rem; }
+  .side-l { grid-column: 1; padding-right: 2.4rem; }
+  .side-r { grid-column: 3; padding-left: 2.4rem; }
+  .stop-no { display: inline-block; padding: 0.35rem 0.8rem; margin-bottom: 1.1rem; background: var(--color-cream); color: var(--color-maroon); font-size: 1.1rem; font-weight: 700; }
+  .stop.wall-cream .stop-no { background: var(--color-maroon); color: var(--color-cream); }
+
+  /* Prints sit in rows that match: one wide print leads each side, then pairs of the same orientation. */
+  .run { display: flex; flex-direction: column; gap: 2.6rem; }
+  .head + .run, .wv + .run { margin-top: 3rem; }
+  .row { display: flex; gap: 1.4rem; align-items: flex-start; justify-content: center; }
+  .cell { min-width: 0; }
+  .row-pair .cell { flex: 1 1 0; }
+  .row-hero .cell { flex: 0 0 100%; }
+  .row-solo .cell { flex: 0 0 64%; }
+
+  /* ---------- the sunset scrubber ---------- */
+  .scrub { max-width: 26rem; }
+  .scrub-view { position: relative; width: 100%; aspect-ratio: 1; border-radius: 50%; padding: 0.7rem; background: var(--color-cream); overflow: hidden; }
+  .scrub-view::before { content: ''; position: absolute; inset: 0.7rem; border-radius: 50%; background: var(--color-ink); }
+  .scrub-view img { position: absolute; inset: 0.7rem; width: calc(100% - 1.4rem); height: calc(100% - 1.4rem); border-radius: 50%; object-fit: cover; opacity: 0; transition: opacity 0.3s ease-out; }
+  .scrub-view img[data-on] { opacity: 1; }
+  .scrub-label { display: block; margin-top: 1.6rem; font-weight: 700; text-align: center; }
+  .scrub-range { display: block; width: 100%; height: 3.6rem; margin-top: 0.8rem; background: transparent; -webkit-appearance: none; appearance: none; cursor: grab; }
+  .scrub-range::-webkit-slider-runnable-track { height: 1.1rem; border-radius: 999px; background: var(--color-maroon-deep); }
+  .scrub-range::-moz-range-track { height: 1.1rem; border-radius: 999px; background: var(--color-maroon-deep); }
+  .scrub-range::-webkit-slider-thumb { -webkit-appearance: none; width: 3.2rem; height: 3.2rem; margin-top: -1.05rem; border-radius: 50%; background: var(--color-cream); box-shadow: 0 0 0 0.5rem var(--color-maroon-light); }
+  .scrub-range::-moz-range-thumb { width: 3.2rem; height: 3.2rem; border: 0; border-radius: 50%; background: var(--color-cream); box-shadow: 0 0 0 0.5rem var(--color-maroon-light); }
+  .scrub-range:focus-visible { outline: 4px solid var(--color-cream); outline-offset: 4px; }
+  .scrub-cap { margin-top: 1rem; font-size: 1.02rem; font-weight: 600; min-height: 2.8em; text-align: center; }
+  .scrub-note { font-size: 0.95rem; opacity: 0.8; text-align: center; }
+
+  /* ---------- the ferris wheel ---------- */
+  .wv { margin-top: 3rem; max-width: 27rem; }
+  .wv-disc { position: relative; display: block; width: 100%; aspect-ratio: 1; border-radius: 50%; padding: 0.7rem; background: var(--color-cream); overflow: hidden; cursor: pointer; }
+  .wv-disc::before { content: ''; position: absolute; inset: 0.7rem; border-radius: 50%; background: var(--color-ink); }
+  .wv-frames { position: absolute; inset: 0.7rem; border-radius: 50%; overflow: hidden; }
+  .wv-frames img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s ease-out; }
+  .wv-frames img[data-on] { opacity: 1; }
+  .wv-cap { margin-top: 1.2rem; font-size: 1.1rem; font-weight: 600; min-height: 3em; text-align: center; }
+  .wv-controls { display: flex; align-items: center; justify-content: center; gap: 1.2rem; margin-top: 0.4rem; }
+  .wv-count { min-width: 5rem; text-align: center; font-size: 1.05rem; font-weight: 700; }
+  .wv-hint { margin-top: 1rem; font-size: 0.95rem; opacity: 0.8; text-align: center; }
+  .wheel { position: relative; width: min(100%, 33rem); aspect-ratio: 100 / 134; margin-inline: auto; touch-action: pan-y; cursor: grab; -webkit-user-select: none; user-select: none; }
+  .wheel[data-dragging] { cursor: grabbing; }
+  .wheel:focus-visible { outline: 4px solid var(--color-cream); outline-offset: 8px; }
+  .wheel-art { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .w-leg { fill: var(--color-maroon-light); }
+  .w-ground { fill: var(--color-maroon); }
+  .w-rim { fill: none; stroke: var(--color-maroon-light); stroke-width: 2.6; }
+  .w-rim-in { stroke-width: 1.6; }
+  .w-spoke { fill: var(--color-maroon-light); }
+  .w-light { fill: var(--color-cream); }
+  .w-hub { fill: var(--color-maroon-light); }
+  .w-hub-in { fill: var(--color-cream); }
+  .cab { position: absolute; width: 25%; transform: translateX(-50%); padding-top: 1rem; --mat: var(--color-maroon-light); transition: transform 0.3s ease-out; }
+  .cab::before { content: ''; position: absolute; left: 50%; top: 0; width: 0.4rem; height: 1.1rem; margin-left: -0.2rem; background: var(--color-cream); }
+  .cab[data-active] { --mat: var(--color-cream); transform: translateX(-50%) scale(1.1); transform-origin: 50% 0; }
+  .wheel .cab :global(.glimpse-tile .cap) { display: none; }
+
+  /* ---------- narrower screens ---------- */
+  @media (max-width: 860px) {
+    .stop-in { grid-template-columns: 4.4rem minmax(0, 1fr); }
+    .sign { grid-column: 1; width: 3.4rem; height: 3.4rem; box-shadow: 0 0 0 0.4rem var(--color-ink); margin-left: -0.35rem; }
+    .sign svg { width: 2rem; height: 2rem; }
+    .side-l, .side-r { grid-column: 2; padding-inline: 0; }
+    .side[data-heading] { grid-row: 1; }
+    .side:not([data-heading]) { grid-row: 2; padding-top: 0 !important; margin-top: 2.4rem; }
+    .row { gap: 0.9rem; }
+    .row-solo .cell { flex: 0 0 78%; }
+    .road-shoulder { stroke-width: 40px; }
+    .road-asphalt { stroke-width: 28px; }
+    .road-dash { stroke-width: 3px; }
+    .wheel { width: min(100%, 24rem); }
+  }
+
+  .viewer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-cream);
+    overflow: hidden;
+  }
+  .viewer::backdrop {
+    background: color-mix(in srgb, var(--color-ink) 93%, transparent);
+    backdrop-filter: blur(10px);
+  }
+  .viewer[open]::backdrop {
+    animation: viewer-fade 0.5s ease both;
+  }
+  /* During the photo morph the browser dims the page itself, and its snapshot must already show the full backdrop. */
+  :global(html[data-vt]) .viewer[open]::backdrop {
+    animation: none;
+  }
+  @keyframes viewer-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  .viewer {
+    --stage-v: 11.5rem;
+    --stage-h: 2rem;
+  }
+  .viewer-stage {
+    position: absolute;
+    inset: 4.5rem 1rem 6.75rem;
+    display: grid;
+    place-items: center;
+  }
+  .viewer-stage img {
+    /* --ar is the photo's width over its height. With it the picture fills the same box whether the small or the large file is showing. */
+    aspect-ratio: var(--ar, auto);
+    width: min(calc(100vw - var(--stage-h)), calc((100dvh - var(--stage-v)) * var(--ar, 1)));
+    height: auto;
+    max-width: calc(100vw - var(--stage-h));
+    max-height: calc(100dvh - var(--stage-v));
+    object-fit: contain;
+    box-shadow: 0 40px 80px -30px rgb(0 0 0 / 0.9);
+    transition: opacity 0.35s;
+  }
+  .viewer-stage img[data-loading] {
+    opacity: 0;
+  }
+  .viewer-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    padding: 0.8rem 1.1rem;
+  }
+  .viewer-prev,
+  .viewer-next {
+    font-size: 2rem;
+    color: var(--color-cream);
+  }
+  .viewer-prev,
+  .viewer-next {
+    position: absolute;
+    bottom: 1rem;
+  }
+  .viewer-prev {
+    left: 1rem;
+  }
+  .viewer-next {
+    right: 1rem;
+  }
+  .viewer-info {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0.9rem;
+    padding-inline: 5rem;
+    text-align: center;
+    pointer-events: none;
+  }
+  .viewer-caption {
+    min-height: 1.4em;
+    font-size: 1.05rem;
+    line-height: 1.4;
+    font-weight: 600;
+  }
+  .viewer-count {
+    margin-top: 0.35rem;
+    font-size: 0.95rem;
+    color: color-mix(in srgb, var(--color-cream) 75%, transparent);
+  }
+  @media (min-width: 900px) {
+    .viewer {
+      --stage-v: 8rem;
+      --stage-h: 14rem;
+    }
+    .viewer-stage {
+      inset: 1.5rem 7rem 6.25rem;
+    }
+    .viewer-prev,
+    .viewer-next {
+      bottom: auto;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .viewer-prev {
+      left: 1.75rem;
+    }
+    .viewer-next {
+      right: 1.75rem;
+    }
+  }
+</style>
+
+<script>
+  // The road is drawn from where each stop's sign sits, and the jeepney drives along it as the page scrolls.
+  const trip = document.querySelector<HTMLElement>('[data-trip]');
+  const svg = trip?.querySelector<SVGSVGElement>('svg.road');
+  const signs = Array.from(trip?.querySelectorAll<HTMLElement>('[data-sign]') ?? []);
+  const roads = Array.from(svg?.querySelectorAll<SVGPathElement>('[data-road]') ?? []);
+  const jeep = svg?.querySelector<SVGGElement>('[data-jeep]');
+  if (trip && svg && roads.length && jeep && signs.length) {
+    let top = 0;
+    let height = 0;
+    let length = 0;
+    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+    const build = () => {
+      const box = trip.getBoundingClientRect();
+      top = box.top + window.scrollY;
+      height = box.height;
+      svg.setAttribute('viewBox', `0 0 ${box.width} ${box.height}`);
+      const pts = signs.map((s) => {
+        const r = s.getBoundingClientRect();
+        return { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 };
+      });
+      const sway = box.width < 861 ? 10 : box.width < 1181 ? 30 : 50;
+      const line = [{ x: pts[0].x, y: 0 }, ...pts, { x: pts[pts.length - 1].x, y: box.height }];
+      let d = `M ${line[0].x} ${line[0].y}`;
+      for (let i = 1; i < line.length; i++) {
+        const a = line[i - 1];
+        const b = line[i];
+        const k = i % 2 ? 1 : -1;
+        const dy = (b.y - a.y) / 3;
+        d += ` C ${a.x + k * sway} ${a.y + dy} ${b.x + k * sway} ${b.y - dy} ${b.x} ${b.y}`;
+      }
+      roads.forEach((p) => p.setAttribute('d', d));
+      length = roads[0].getTotalLength();
+      drive();
+    };
+    const drive = () => {
+      const p = clamp((window.scrollY + window.innerHeight * 0.55 - top) / height, 0, 1);
+      const at = p * length;
+      const a = roads[0].getPointAtLength(at);
+      const b = roads[0].getPointAtLength(Math.min(length, at + 2));
+      const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+      jeep.setAttribute('transform', `translate(${a.x} ${a.y}) rotate(${angle})`);
+    };
+    let queued = false;
+    window.addEventListener('scroll', () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        drive();
+      });
+    }, { passive: true });
+    new ResizeObserver(build).observe(trip);
+    window.addEventListener('load', build);
+    build();
+  }
+
+  // The sunset scrubber: sliding the sun shows one frame at a time.
+  document.querySelectorAll<HTMLElement>('[data-scrub]').forEach((root) => {
+    const frames = Array.from(root.querySelectorAll<HTMLImageElement>('[data-frame]'));
+    const range = root.querySelector<HTMLInputElement>('input[type="range"]');
+    const cap = root.querySelector<HTMLElement>('[data-scrub-cap]');
+    range?.addEventListener('input', () => {
+      const i = Number(range.value);
+      frames.forEach((f, n) => f.toggleAttribute('data-on', n === i));
+      if (cap) cap.textContent = frames[i]?.dataset.caption ?? '';
+    });
+  });
+
+  // The ferris wheel: it turns when dragged, from the arrows, or when a cabin is pressed. The cabin at the bottom is the one on show.
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.querySelectorAll<HTMLElement>('[data-wheel]').forEach((root) => {
+    const stop = root.closest<HTMLElement>('.stop');
+    if (!stop) return;
+    const rotor = root.querySelector<SVGGElement>('[data-rotor]');
+    const cabs = Array.from(root.querySelectorAll<HTMLElement>('.cab'));
+    const frames = Array.from(stop.querySelectorAll<HTMLImageElement>('[data-wframe]'));
+    const capEl = stop.querySelector<HTMLElement>('[data-wheel-cap]');
+    const countEl = stop.querySelector<HTMLElement>('[data-wheel-count]');
+    const N = cabs.length;
+    const step = 360 / N;
+    const R = 38;
+    const H = 134;
+    let a = 180; // cabin 0 starts at the bottom
+    let target = a;
+    let active = -1;
+    let dragging = false;
+    let raf = 0;
+    let last = 0;
+    const idxFor = (angle: number) => {
+      let best = 0;
+      let bestD = 1e9;
+      cabs.forEach((_, i) => {
+        const d = Math.abs((((i * step + angle - 180) % 360) + 540) % 360 - 180);
+        if (d < bestD) { bestD = d; best = i; }
+      });
+      return best;
+    };
+    const setActive = (i: number) => {
+      active = i;
+      cabs.forEach((c, n) => c.toggleAttribute('data-active', n === i));
+      frames.forEach((f, n) => f.toggleAttribute('data-on', n === i));
+      const tile = cabs[i]?.querySelector<HTMLElement>('.glimpse-tile');
+      if (capEl) capEl.textContent = tile?.dataset.caption ?? '';
+      if (countEl) countEl.textContent = `${i + 1} of ${N}`;
+    };
+    const place = () => {
+      rotor?.setAttribute('transform', `rotate(${a.toFixed(2)} 50 50)`);
+      cabs.forEach((c, i) => {
+        const th = ((i * step + a) * Math.PI) / 180;
+        c.style.left = `${(50 + R * Math.sin(th)).toFixed(3)}%`;
+        c.style.top = `${(((50 - R * Math.cos(th)) / H) * 100).toFixed(3)}%`;
+      });
+      const idx = idxFor(a);
+      if (idx !== active) setActive(idx);
+    };
+    const frame = (now: number) => {
+      raf = 0;
+      const dt = Math.min(64, now - (last || now - 16));
+      last = now;
+      a += (target - a) * (1 - Math.exp(-dt / (dragging ? 40 : 110)));
+      if (Math.abs(target - a) < 0.05) a = target;
+      place();
+      if (a !== target || dragging) raf = requestAnimationFrame(frame);
+      else last = 0;
+    };
+    const go = () => {
+      if (reducedMotion) {
+        a = target;
+        place();
+      } else if (!raf) raf = requestAnimationFrame(frame);
+    };
+    const rotateTo = (i: number) => {
+      let t = 180 - i * step;
+      while (t - target > 180) t -= 360;
+      while (t - target < -180) t += 360;
+      target = t;
+      go();
+    };
+    const move = (by: number) => rotateTo((idxFor(target) + by + N) % N);
+
+    let lastAng = 0;
+    let moved = 0;
+    let justDragged = false;
+    const angle = (e: PointerEvent) => {
+      const r = root.getBoundingClientRect();
+      return (Math.atan2(e.clientY - (r.top + (r.height * 50) / H), e.clientX - (r.left + r.width / 2)) * 180) / Math.PI;
+    };
+    root.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      dragging = true;
+      moved = 0;
+      lastAng = angle(e);
+      root.setPointerCapture(e.pointerId);
+      root.toggleAttribute('data-dragging', true);
+      go();
+    });
+    root.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const now = angle(e);
+      let d = now - lastAng;
+      if (d > 180) d -= 360;
+      if (d < -180) d += 360;
+      lastAng = now;
+      moved += Math.abs(d);
+      target += d;
+      go();
+    });
+    const release = () => {
+      if (!dragging) return;
+      dragging = false;
+      root.removeAttribute('data-dragging');
+      justDragged = moved > 4;
+      window.setTimeout(() => (justDragged = false), 60);
+      rotateTo(idxFor(target));
+    };
+    root.addEventListener('pointerup', release);
+    root.addEventListener('pointercancel', release);
+    root.addEventListener('lostpointercapture', release);
+    // A press on a cabin brings it to the bottom; pressing the cabin already there opens the photograph.
+    root.addEventListener('click', (e) => {
+      const cab = (e.target as HTMLElement).closest<HTMLElement>('.cab');
+      if (!cab) return;
+      const i = Number(cab.dataset.cab);
+      if (justDragged || i !== idxFor(target)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (!justDragged) rotateTo(i);
+      }
+    }, true);
+    root.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); move(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); move(1); }
+    });
+    stop.querySelector('[data-wheel-prev]')?.addEventListener('click', () => move(-1));
+    stop.querySelector('[data-wheel-next]')?.addEventListener('click', () => move(1));
+    stop.querySelector('[data-wheel-open]')?.addEventListener('click', () => cabs[idxFor(target)]?.querySelector<HTMLElement>('.glimpse-tile')?.click());
+    place();
+  });
+</script>
+
+<script>
+  const tiles = Array.from(document.querySelectorAll<HTMLButtonElement>('.glimpse-tile'));
+  const dialog = document.getElementById('glimpse-dialog') as HTMLDialogElement | null;
+  const large = document.getElementById('glimpse-large') as HTMLImageElement | null;
+  const count = document.getElementById('glimpse-count');
+  const captionEl = document.getElementById('glimpse-caption');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let current = 0;
+
+  function setImage(index: number) {
+    if (!large || tiles.length === 0) return;
+    current = (index + tiles.length) % tiles.length;
+    const tile = tiles[current];
+    const full = tile.dataset.large ?? '';
+    const thumb = tile.querySelector('img');
+    large.dataset.full = full;
+    if (thumb && thumb.complete && thumb.naturalWidth > 0) {
+      // The small picture is already on screen, so show it at once in the large frame and swap in the sharp one when it has loaded. The viewer is never empty, and the photo's size never jumps.
+      large.removeAttribute('data-loading');
+      large.style.setProperty('--ar', String(thumb.naturalWidth / thumb.naturalHeight));
+      large.src = thumb.currentSrc || thumb.src;
+      if (full) {
+        const sharp = new Image();
+        sharp.src = full;
+        sharp
+          .decode()
+          .catch(() => undefined)
+          .then(() => {
+            if (large.dataset.full === full) large.src = full;
+          });
+      }
+    } else {
+      large.style.removeProperty('--ar');
+      large.setAttribute('data-loading', '');
+      large.onload = () => large.removeAttribute('data-loading');
+      large.src = full;
+    }
+    const caption = tile.dataset.caption ?? '';
+    large.alt = caption || `Glimpse of Sorsogon, photo ${tile.dataset.n}`;
+    if (captionEl) captionEl.textContent = caption;
+    if (count) count.textContent = `${[tile.dataset.chapter, `${current + 1} of ${tiles.length}`].filter(Boolean).join(', ')}`;
+    history.replaceState(null, '', `#p${tile.dataset.n}`);
+    // Warm the neighbours so stepping through is instant.
+    [current - 1, current + 1].forEach((i) => {
+      const n = tiles[(i + tiles.length) % tiles.length];
+      if (n?.dataset.large) new Image().src = n.dataset.large;
+    });
+  }
+
+  // The tile's photo grows into the viewer and shrinks back again, where the browser supports view transitions.
+  function morph(update: () => void, from: HTMLElement | null, to: HTMLElement | null) {
+    const start = (document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } }).startViewTransition;
+    if (!start || reduced || !from || !to) {
+      update();
+      return;
+    }
+    document.documentElement.dataset.vt = 'glimpse';
+    from.style.viewTransitionName = 'glimpse';
+    const transition = start.call(document, () => {
+      from.style.viewTransitionName = '';
+      to.style.viewTransitionName = 'glimpse';
+      update();
+    });
+    transition.finished.finally(() => {
+      to.style.viewTransitionName = '';
+      delete document.documentElement.dataset.vt;
+    });
+  }
+
+  function openAt(index: number) {
+    if (!dialog) return;
+    const img = tiles[(index + tiles.length) % tiles.length]?.querySelector('img') ?? null;
+    morph(
+      () => {
+        setImage(index);
+        if (!dialog.open) dialog.showModal();
+      },
+      img as HTMLElement | null,
+      large
+    );
+  }
+
+  function closeViewer() {
+    if (!dialog || !dialog.open) return;
+    const img = tiles[current]?.querySelector('img') as HTMLElement | null;
+    const finish = () => {
+      dialog.close();
+      history.replaceState(null, '', location.pathname);
+    };
+    // Swap which element holds the name, then close.
+    const start = (document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } }).startViewTransition;
+    if (!start || reduced || !img || !large) {
+      finish();
+      return;
+    }
+    document.documentElement.dataset.vt = 'glimpse';
+    large.style.viewTransitionName = 'glimpse';
+    const t = start.call(document, () => {
+      large.style.viewTransitionName = '';
+      finish();
+      // Having stepped through photos, the tile may be off screen or cut by the edge: bring it to the middle first, so the photo lands squarely on it.
+      const box = img.getBoundingClientRect();
+      if (box.top < 80 || box.bottom > window.innerHeight - 40) img.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
+      img.style.viewTransitionName = 'glimpse';
+    });
+    t.finished.finally(() => {
+      img.style.viewTransitionName = '';
+      delete document.documentElement.dataset.vt;
+    });
+  }
+
+  tiles.forEach((tile, i) => tile.addEventListener('click', () => openAt(i)));
+  document.getElementById('glimpse-prev')?.addEventListener('click', () => setImage(current - 1));
+  document.getElementById('glimpse-next')?.addEventListener('click', () => setImage(current + 1));
+  document.getElementById('glimpse-close')?.addEventListener('click', closeViewer);
+  dialog?.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement;
+    if (target === dialog || target.classList.contains('viewer-stage')) closeViewer();
+  });
+  dialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeViewer();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (!dialog?.open) return;
+    if (event.key === 'ArrowLeft') setImage(current - 1);
+    if (event.key === 'ArrowRight') setImage(current + 1);
+  });
+
+  // Swipe between photos on touch screens.
+  let touchX = 0;
+  dialog?.addEventListener('touchstart', (e) => (touchX = e.changedTouches[0].clientX), { passive: true });
+  dialog?.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 50) setImage(current + (dx < 0 ? 1 : -1));
+  });
+
+  // A link such as /glimpse#p12 (from the home page) opens that photo.
+  const wanted = /^#p(\d+)$/.exec(location.hash)?.[1];
+  if (wanted) {
+    const index = tiles.findIndex((t) => t.dataset.n === wanted);
+    if (index >= 0) openAt(index);
+  }
+</script>

@@ -1,0 +1,48 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ScrapbookTemplate from '../../components/ScrapbookTemplate.astro';
+import StructureCard from '../../components/StructureCard.astro';
+import Rail from '../../components/Rail.astro';
+import { getCollection } from 'astro:content';
+import { excerpt, slugify } from '../../lib/text';
+
+export async function getStaticPaths() {
+  const structures = await getCollection('structures');
+  return structures.map((structure) => ({ params: { id: structure.id }, props: { structure } }));
+}
+
+const { structure } = Astro.props;
+const all = await getCollection('structures');
+const neighbours = all
+  .filter((s) => s.data.municipality === structure.data.municipality && s.id !== structure.id)
+  .sort((a, b) => a.data.name.localeCompare(b.data.name));
+---
+<Layout title={structure.data.name} description={excerpt(structure.data.technicalDescription, 155) ?? undefined}>
+  <main id="main">
+    <ScrapbookTemplate
+      id={structure.id}
+      name={structure.data.name}
+      municipality={structure.data.municipality}
+      photo={structure.data.photo}
+      yearBuilt={structure.data.yearBuilt}
+      classification={structure.data.classification}
+      materials={structure.data.materials}
+      occupancy={structure.data.occupancy}
+      interventionLevel={structure.data.interventionLevel}
+      history={structure.data.history}
+      technicalDescription={structure.data.technicalDescription}
+      featureStory={structure.data.featureStory}
+    />
+    {neighbours.length > 0 && (
+      <div class="wall-maroon pb-4">
+        <Rail title={`More in ${structure.data.municipality}`} href={`/explore/${slugify(structure.data.municipality)}/`} hrefLabel="All in this municipality">
+          {neighbours.map((s) => (
+            <li>
+              <StructureCard id={s.id} name={s.data.name} municipality={s.data.municipality} photo={s.data.photo} yearBuilt={s.data.yearBuilt} showMunicipality={false} />
+            </li>
+          ))}
+        </Rail>
+      </div>
+    )}
+  </main>
+</Layout>

@@ -1,0 +1,480 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Arrow from '../components/Arrow.astro';
+import { getCollection } from 'astro:content';
+import { getStructurePhoto } from '../lib/photos';
+import { pickVariant, extractPullQuote } from '../lib/variant';
+
+const structures = await getCollection('structures');
+const stories = structures
+  .filter((s) => s.data.featureStory)
+  .sort((a, b) => a.data.name.localeCompare(b.data.name))
+  .map((s) => ({
+    id: s.id,
+    name: s.data.name,
+    municipality: s.data.municipality,
+    photo: getStructurePhoto(s.data.photo ?? s.id, 'thumb'),
+    quote: extractPullQuote(s.data.featureStory!, 130),
+    tone: (['cream', 'navy', 'maroon'] as const)[pickVariant(s.data.name, 3)],
+    tilt: [-2.2, 1.6, -1, 2.4][pickVariant(`${s.data.name}-tilt`, 4)]
+  }));
+---
+<Layout title="Feature Stories" tone="ink" description="Stories gathered from the people who live with the historical structures of Sorsogon.">
+  <main id="main" class="wall-ink">
+    <section class="deck-page" data-deck data-view="deck">
+      <div class="mx-auto flex max-w-[84rem] flex-wrap items-end justify-between gap-x-10 gap-y-6 px-5 pb-2 pt-10 sm:px-8 sm:pt-12">
+        <div>
+          <h1 class="display-lg">Feature stories</h1>
+          <p class="mt-4 max-w-xl text-[1.1rem] text-cream/80">Recollections from the people who live with these structures. {stories.length > 0 && `${stories.length} ${stories.length === 1 ? 'story' : 'stories'}.`}</p>
+        </div>
+        {stories.length > 0 && (
+          <div class="seg" role="group" aria-label="View">
+            <button type="button" data-view-btn="deck" aria-pressed="true">Deck</button>
+            <button type="button" data-view-btn="grid" aria-pressed="false">Grid</button>
+          </div>
+        )}
+      </div>
+
+      {stories.length === 0 && <p class="mx-auto max-w-[84rem] px-5 pb-32 pt-10 text-[1.1rem] text-cream/75 sm:px-8">No feature stories are recorded.</p>}
+
+      {stories.length > 0 && (
+        <>
+          <div class="deck-wrap">
+            <ul class="deck-stage" data-stage tabindex="0" aria-roledescription="carousel" aria-label="Feature stories">
+              {stories.map((s) => (
+                <li class={`page tone-${s.tone}`} data-page style={`--tilt:${s.tilt}deg`}>
+                  <a href={`/structures/${s.id}/#story`} data-sp={s.id} class="page-link group">
+                    <span class="page-photo">
+                      <span class="page-tape" aria-hidden="true"></span>
+                      {s.photo ? <img src={s.photo} alt={s.name} width="480" height="360" loading="lazy" decoding="async" draggable="false" /> : <span class="page-nophoto">No photo available</span>}
+                    </span>
+                    <span class="page-tag">{s.municipality}</span>
+                    <span class="page-name font-display">{s.name}</span>
+                    <span class="page-quote">&ldquo;{s.quote}&rdquo;</span>
+                    <span class="page-go"><span class="link-draw">Read the story</span></span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div class="deck-bar mx-auto max-w-[84rem] px-5 pb-20 sm:px-8">
+            <div class="mx-auto grid max-w-[36rem] grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-8">
+              <button type="button" class="nav-arrow justify-self-end !text-[1.4rem] sm:!text-[2rem]" data-prev aria-label="Previous story"><Arrow dir="left" /></button>
+              <a href="#" class="btn whitespace-nowrap !min-w-[10rem] !px-7 sm:!min-w-[14rem]" data-open>Read this story</a>
+              <button type="button" class="nav-arrow justify-self-start !text-[1.4rem] sm:!text-[2rem]" data-next aria-label="Next story"><Arrow /></button>
+            </div>
+            <p class="mt-6 text-center text-[1.02rem] font-semibold text-cream/80" data-counter aria-live="polite"></p>
+          </div>
+        </>
+      )}
+    </section>
+  </main>
+</Layout>
+
+<style>
+  .deck-page {
+    background:
+      radial-gradient(60% 46% at 50% 62%, color-mix(in srgb, var(--color-navy) 82%, transparent) 0%, transparent 72%),
+      var(--color-ink);
+    overflow-x: clip;
+  }
+  .seg {
+    display: inline-flex;
+    background: color-mix(in srgb, var(--color-cream) 14%, var(--color-ink));
+    padding: 4px;
+  }
+  .seg button {
+    padding: 0.6rem 1.3rem;
+    font-weight: 700;
+    font-size: 0.98rem;
+    color: var(--color-cream);
+    transition: background-color 0.35s, color 0.35s;
+  }
+  .seg button[aria-pressed='true'] {
+    background: var(--color-cream);
+    color: var(--color-maroon);
+  }
+
+  /* ---------- the deck: pages fanned in perspective ---------- */
+  .deck-wrap {
+    --w: clamp(16rem, min(24vw, 36vh), 23rem);
+    perspective: 2400px;
+    perspective-origin: 50% 40%;
+    padding-block: 2.2rem 1.6rem;
+  }
+  .deck-stage {
+    position: relative;
+    height: calc(var(--w) * 1.6);
+    outline: none;
+    touch-action: pan-y;
+    cursor: grab;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .deck-stage:focus-visible {
+    outline: 3px solid var(--color-cream);
+    outline-offset: 8px;
+  }
+  [data-view='deck'] .deck-stage[data-drag] {
+    cursor: grabbing;
+  }
+  .page {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: var(--w);
+    height: 100%;
+    margin-left: calc(var(--w) / -2);
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+  .page-link {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0.9rem 0.9rem 1.2rem;
+    overflow: hidden;
+    box-shadow: 0 40px 60px -34px rgb(0 0 0 / 0.95);
+    background-image: var(--paper-grain);
+  }
+  .tone-cream .page-link {
+    background-color: var(--color-cream);
+    color: var(--color-maroon);
+    --tape: var(--color-navy);
+  }
+  .tone-navy .page-link {
+    background-color: var(--color-navy);
+    background-image: var(--grain);
+    color: var(--color-cream);
+    --tape: var(--color-cream);
+  }
+  .tone-maroon .page-link {
+    background-color: var(--color-maroon-light);
+    background-image: var(--grain);
+    color: var(--color-cream);
+    --tape: var(--color-cream);
+  }
+  .page-photo {
+    position: relative;
+    display: block;
+    flex: none;
+    padding: 5px;
+    background: var(--color-cream);
+    transform: rotate(var(--tilt, 0deg));
+    box-shadow: 0 16px 24px -14px rgb(0 0 0 / 0.6);
+  }
+  .page-photo img,
+  .page-nophoto {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+  }
+  .page-nophoto {
+    display: grid;
+    place-items: center;
+    background: var(--color-navy);
+    color: var(--color-cream);
+    font-size: 0.9rem;
+  }
+  .page-tape {
+    position: absolute;
+    z-index: 2;
+    top: -0.9rem;
+    left: 50%;
+    width: 5.5rem;
+    height: 1.7rem;
+    margin-left: -2.75rem;
+    transform: rotate(3deg);
+    background: color-mix(in srgb, var(--tape) 82%, transparent);
+  }
+  .page-tag {
+    align-self: flex-start;
+    margin-top: 1.3rem;
+    padding: 0.25rem 0.7rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    background: var(--color-ink);
+    color: var(--color-cream);
+  }
+  .tone-cream .page-tag {
+    background: var(--color-maroon);
+  }
+  .page-name {
+    margin-top: 0.85rem;
+    font-size: clamp(1.6rem, 2.3vw, 2.1rem);
+    line-height: 1.04;
+  }
+  /* The quote fills the room between the title and the link. A script sets how many whole lines fit, so a line is never half cut off. */
+  .page-quote {
+    flex: 1 1 0;
+    min-height: 0;
+    margin-top: 0.8rem;
+    font-size: 1.02rem;
+    line-height: 1.55;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .page-go {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    flex: none;
+    padding-top: 0.8rem;
+    font-weight: 700;
+  }
+
+  [data-view='deck'] .page:not([data-active]) .page-link {
+    cursor: pointer;
+  }
+  [data-view='deck'] .page:not([data-active]) .link-draw {
+    background-size: 0 2px !important;
+  }
+  [data-view='deck'] .page:not([data-active]):hover {
+    filter: brightness(0.92) !important;
+    transition: filter 0.2s;
+  }
+
+  /* ---------- grid view: the same pages laid flat ---------- */
+  [data-view='grid'] .deck-wrap {
+    perspective: none;
+    padding-inline: max(1.25rem, calc((100% - 84rem) / 2 + 2rem));
+  }
+  [data-view='grid'] .deck-stage {
+    display: grid;
+    height: auto;
+    gap: 2.5rem 2rem;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+    cursor: auto;
+  }
+  [data-view='grid'] .page-quote {
+    flex: none;
+    -webkit-line-clamp: 4 !important;
+  }
+  [data-view='grid'] .page {
+    position: relative;
+    left: auto;
+    width: auto;
+    height: auto;
+    min-height: 31rem;
+    margin: 0;
+    transform: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+    transition: transform 0.3s ease-out;
+  }
+  [data-view='grid'] .page:hover {
+    transform: translateY(-4px) !important;
+  }
+  [data-view='grid'] .deck-bar {
+    display: none;
+  }
+</style>
+
+<script>
+  import { frameSeconds } from '../lib/motion';
+
+  const root = document.querySelector<HTMLElement>('[data-deck]');
+  const stage = root?.querySelector<HTMLElement>('[data-stage]');
+  if (root && stage) {
+    const pages = Array.from(stage.querySelectorAll<HTMLElement>('[data-page]'));
+    const links = pages.map((p) => p.querySelector<HTMLAnchorElement>('a')!);
+    const open = root.querySelector<HTMLAnchorElement>('[data-open]');
+    const counter = root.querySelector<HTMLElement>('[data-counter]');
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const last = pages.length - 1;
+    let pos = Math.floor(last / 2);
+    let target = pos;
+    let dragging = false;
+    let raf = 0;
+    let lastT = 0;
+    const clamp = (n: number) => Math.min(last, Math.max(0, n));
+    const gridMode = () => root.dataset.view === 'grid';
+
+    // Show only as many whole lines of each quote as the card has room for.
+    function fitQuotes() {
+      pages.forEach((p) => {
+        const q = p.querySelector<HTMLElement>('.page-quote');
+        if (!q) return;
+        if (gridMode()) {
+          q.style.removeProperty('-webkit-line-clamp');
+          q.style.visibility = '';
+          return;
+        }
+        const lh = parseFloat(getComputedStyle(q).lineHeight) || 24;
+        const lines = Math.floor(q.clientHeight / lh);
+        q.style.visibility = lines < 1 ? 'hidden' : '';
+        q.style.setProperty('-webkit-line-clamp', String(Math.max(1, lines)));
+      });
+    }
+    new ResizeObserver(fitQuotes).observe(stage);
+    document.fonts?.ready.then(fitQuotes);
+    fitQuotes();
+
+    function render() {
+      if (gridMode()) return;
+      const w = pages[0].offsetWidth;
+      pages.forEach((el, i) => {
+        const o = i - pos;
+        const a = Math.abs(o);
+        const s = Math.sign(o);
+        const near = Math.min(a, 1);
+        const far = Math.max(a - 1, 0);
+        const x = s * (near * 0.66 * w + far * 0.15 * w);
+        const rot = -s * near * 58;
+        const z = -near * 90 - far * 70;
+        const scale = 1 - Math.min(a, 4) * 0.025;
+        const fade = a > 4.2 ? Math.max(0, 1 - (a - 4.2) * 1.5) : 1;
+        el.style.transform = `translate3d(${x}px, 0, ${z}px) rotateY(${rot}deg) scale(${scale})`;
+        el.style.opacity = String(fade);
+        el.style.zIndex = String(100 - Math.round(a * 10));
+        el.style.filter = a < 0.02 ? 'none' : `brightness(${1 - Math.min(a, 3) * 0.14})`;
+        el.style.pointerEvents = fade < 0.05 ? 'none' : 'auto';
+      });
+      const active = clamp(Math.round(pos));
+      pages.forEach((el, i) => (i === active ? el.setAttribute('data-active', '') : el.removeAttribute('data-active')));
+      links.forEach((l, i) => (l.tabIndex = i === active ? 0 : -1));
+      if (open) open.href = links[active].href;
+      if (counter) counter.textContent = `${active + 1} of ${pages.length}`;
+    }
+
+    function loop(t: number) {
+      const dt = frameSeconds(t, lastT);
+      lastT = t;
+      if (!dragging) {
+        const diff = target - pos;
+        if (Math.abs(diff) < 0.0008) pos = target;
+        else pos += diff * (1 - Math.exp(-dt * 8));
+      }
+      render();
+      raf = !dragging && pos === target ? 0 : requestAnimationFrame(loop);
+    }
+    const kick = () => {
+      if (reduced) {
+        pos = target;
+        render();
+        return;
+      }
+      if (!raf) {
+        lastT = performance.now();
+        raf = requestAnimationFrame(loop);
+      }
+    };
+    const go = (i: number) => {
+      target = clamp(i);
+      kick();
+    };
+
+    // Dragging with a mouse or finger.
+    let startX = 0;
+    let startPos = 0;
+    let moved = false;
+    let lastX = 0;
+    let velocity = 0;
+    stage.addEventListener('pointerdown', (e) => {
+      if (gridMode() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      dragging = true;
+      moved = false;
+      startX = lastX = e.clientX;
+      startPos = pos;
+      velocity = 0;
+      kick();
+    });
+    stage.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 6) {
+        if (!moved) stage.setPointerCapture(e.pointerId);
+        moved = true;
+        stage.setAttribute('data-drag', '');
+      }
+      const w = pages[0].offsetWidth;
+      pos = Math.min(last + 0.4, Math.max(-0.4, startPos - dx / (w * 0.62)));
+      velocity = (lastX - e.clientX) / w;
+      lastX = e.clientX;
+    });
+    const release = () => {
+      if (!dragging) return;
+      dragging = false;
+      stage.removeAttribute('data-drag');
+      target = clamp(Math.round(pos + velocity * 2.4));
+      kick();
+    };
+    stage.addEventListener('pointerup', release);
+    stage.addEventListener('pointercancel', release);
+
+    // A click on a side page brings it to the centre; a click on the centre page opens it.
+    stage.addEventListener('click', (e) => {
+      if (gridMode()) return;
+      if (moved) {
+        e.preventDefault();
+        moved = false;
+        return;
+      }
+      const page = (e.target as HTMLElement).closest<HTMLElement>('[data-page]');
+      if (!page) return;
+      const i = pages.indexOf(page);
+      if (i !== clamp(Math.round(target))) {
+        e.preventDefault();
+        go(i);
+      }
+    });
+
+    stage.addEventListener('keydown', (e) => {
+      if (gridMode()) return;
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        go(Math.round(target) + 1);
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        go(Math.round(target) - 1);
+      }
+    });
+    // Sideways trackpad swipes move the deck; vertical scrolling stays with the page.
+    let wheelAcc = 0;
+    stage.addEventListener('wheel', (e) => {
+      if (gridMode() || Math.abs(e.deltaX) < Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      wheelAcc += e.deltaX;
+      if (Math.abs(wheelAcc) > 60) {
+        go(Math.round(target) + Math.sign(wheelAcc));
+        wheelAcc = 0;
+      }
+    }, { passive: false });
+
+    root.querySelector('[data-prev]')?.addEventListener('click', () => go(Math.round(target) - 1));
+    root.querySelector('[data-next]')?.addEventListener('click', () => go(Math.round(target) + 1));
+    window.addEventListener('resize', render);
+
+    // Deck or grid.
+    root.querySelectorAll<HTMLButtonElement>('[data-view-btn]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const view = btn.dataset.viewBtn!;
+        if (root.dataset.view === view) return;
+        const apply = () => {
+          root.dataset.view = view;
+          root.querySelectorAll<HTMLButtonElement>('[data-view-btn]').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+          if (view === 'grid') {
+            pages.forEach((el) => {
+              el.style.transform = el.style.opacity = el.style.filter = el.style.zIndex = el.style.pointerEvents = '';
+            });
+            pages.forEach((el) => el.removeAttribute('data-active'));
+            links.forEach((l) => (l.tabIndex = 0));
+          } else render();
+          fitQuotes();
+        };
+        // A short crossfade between the two arrangements where the browser supports it.
+        const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
+        if (doc.startViewTransition && !reduced) doc.startViewTransition(apply);
+        else apply();
+      });
+    });
+
+    render();
+  }
+</script>

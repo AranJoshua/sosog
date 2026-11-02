@@ -1,0 +1,119 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Hero from '../components/Hero.astro';
+import type { HeroSlide } from '../components/Hero.astro';
+import MunicipalityArcade from '../components/MunicipalityArcade.astro';
+import Rail from '../components/Rail.astro';
+import StructureCard from '../components/StructureCard.astro';
+import MapTeaser from '../components/MapTeaser.astro';
+import { getCollection } from 'astro:content';
+import { carouselItems, groupByClassification, groupByMunicipality } from '../lib/structures';
+import { countLabel } from '../lib/text';
+import { getGlimpsePhotos, getStructurePhoto, isLandscapePhoto } from '../lib/photos';
+import { GLIMPSE_HOME_PICKS } from '../data/glimpse';
+
+const structures = await getCollection('structures');
+const items = carouselItems(structures, (key) => getStructurePhoto(key, 'thumb') !== null);
+const groups = groupByMunicipality(structures);
+const rows = groupByClassification(structures, 2).slice(0, 5);
+
+// The hero shows one structure from each kind of building, oldest first within its kind, so it opens on variety.
+const KIND_ORDER = ['church', 'residential', 'ruins', 'watchtower', 'lighthouse', 'government', 'educational'];
+const kindRank = (c: string | null | undefined) => {
+  const value = (c ?? '').toLowerCase();
+  const found = KIND_ORDER.findIndex((k) => value.includes(k));
+  return found === -1 ? KIND_ORDER.length : found;
+};
+const year = (s: (typeof structures)[number]) => Number.parseInt(s.data.yearBuilt ?? '', 10) || 9999;
+const candidates = structures
+  .filter((s) => isLandscapePhoto(s.data.photo ?? s.id, 'large'))
+  .sort((a, b) => kindRank(a.data.classification) - kindRank(b.data.classification) || year(a) - year(b) || a.data.name.localeCompare(b.data.name));
+const seen = new Set<string>();
+const heroSlides: HeroSlide[] = [];
+for (const s of candidates) {
+  const kind = (s.data.classification ?? '').toLowerCase();
+  if (seen.has(kind)) continue;
+  seen.add(kind);
+  heroSlides.push({
+    id: s.id,
+    name: s.data.name,
+    municipality: s.data.municipality,
+    year: s.data.yearBuilt ?? null,
+    photo: getStructurePhoto(s.data.photo ?? s.id, 'large')!,
+    thumb: getStructurePhoto(s.data.photo ?? s.id, 'thumb')
+  });
+  if (heroSlides.length === 5) break;
+}
+const years = structures.map((s) => Number.parseInt(s.data.yearBuilt ?? '', 10)).filter((y) => y >= 1500 && y <= 2100);
+const earliest = years.length ? Math.min(...years) : null;
+
+const all = getGlimpsePhotos();
+const picked = GLIMPSE_HOME_PICKS.flatMap((n) => all.find((p) => p.n === n) ?? []);
+const glimpse = picked.length >= 7 ? picked.slice(0, 7) : [...picked, ...all.filter((p) => !picked.includes(p))].slice(0, 7);
+---
+<Layout title="Home" tone="maroon">
+  <main id="main">
+    {heroSlides.length > 0 ? (
+      <Hero slides={heroSlides} structureCount={structures.length} municipalityCount={groups.length} earliest={earliest} />
+    ) : (
+      <section class="wall-ink">
+        <div class="mx-auto w-full max-w-[84rem] px-5 pb-20 pt-24 sm:px-8">
+          <h1 class="display-xl" style="font-family: var(--font-wordmark)">SOSOG</h1>
+          <p class="lead mt-6">{structures.length > 0 ? `${countLabel(structures.length)} documented in Sorsogon province.` : 'No structures are documented.'}</p>
+        </div>
+      </section>
+    )}
+
+    <section id="explore" class="wall-cream pb-24 pt-20 sm:pt-28">
+      <div class="gutter mb-14 flex flex-wrap items-end justify-between gap-x-10 gap-y-5">
+        <h2 class="display-lg max-w-[13ch]">Start with a municipality</h2>
+        <p class="lead max-w-md text-maroon/85">Every arch opens onto the structures documented in that municipality.</p>
+      </div>
+      <MunicipalityArcade items={items} />
+    </section>
+
+    <section class="wall-maroon space-y-24 pb-28 pt-24">
+      {rows.map((row) => (
+        <Rail title={row.label} count={row.items.length}>
+          {row.items.map((s) => (
+            <li>
+              <StructureCard id={s.id} name={s.data.name} municipality={s.data.municipality} photo={s.data.photo} yearBuilt={s.data.yearBuilt} />
+            </li>
+          ))}
+        </Rail>
+      ))}
+    </section>
+
+    {glimpse.length > 0 && (
+      <section class="wall-navy-mid pb-32 pt-20 sm:pt-28">
+        <div class="mx-auto max-w-[84rem] px-5 sm:px-8">
+          <div class="flex flex-wrap items-end justify-between gap-x-10 gap-y-4">
+            <h2 class="display-lg">Glimpse of Sorsogon</h2>
+            <a href="/glimpse/" class="btn">See every photo</a>
+          </div>
+          <ul class="mt-16 grid grid-cols-2 gap-5 sm:grid-cols-4 lg:grid-cols-7">
+            {glimpse.map((p, i) => (
+              <li class:list={[{ 'lg:translate-y-14': i % 2 === 1 }]}>
+                <a href={`/glimpse/#p${p.n}`} class="glimpse-tile group block bg-cream p-[6px] shadow-[0_22px_30px_-20px_rgb(0_0_0/0.85)]" aria-label={`Open photo ${p.n} of Sorsogon`}>
+                  <span class="block overflow-hidden"><img src={p.thumb} alt="" width="360" height="480" loading="lazy" decoding="async" class="aspect-[3/4] w-full object-cover" /></span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+    )}
+
+    <MapTeaser pins={structures.map((s) => ({ latitude: s.data.latitude, longitude: s.data.longitude }))} documented={groups.map((g) => g.name)} />
+  </main>
+</Layout>
+
+<style>
+  .glimpse-tile img {
+    transition: transform 0.5s var(--ease-out);
+  }
+  .glimpse-tile:hover img,
+  .glimpse-tile:focus-visible img {
+    transform: scale(1.03);
+  }
+</style>

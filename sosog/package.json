@@ -1,0 +1,44 @@
+{
+  "name": "sosog",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "npm run sync:sheet && astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "sync:sheet": "tsx scripts/sync-sheet.ts",
+    "validate:data": "tsx scripts/validate-data.ts",
+    "typecheck": "astro check",
+    "check:links": "tsx scripts/check-links.ts",
+    "test": "node --import tsx --test scripts/lib/validate-row.test.ts scripts/lib/clean-text.test.ts scripts/lib/is-main.test.ts scripts/sync-sheet.test.ts scripts/validate-data.test.ts src/lib/photos.test.ts src/lib/map-geometry.test.ts src/components/Map.test.ts src/lib/text.test.ts src/lib/variant.test.ts src/lib/motion.test.ts src/lib/structures.test.ts src/lib/intervention.test.ts src/lib/intervention-art.test.ts"
+  },
+  "dependencies": {
+    "@astrojs/react": "^7.0.0",
+    "@fontsource/josefin-sans": "^5.3.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "astro": "^7.3.4",
+    "nodemailer": "^10.0.10",
+    "papaparse": "^5.7.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/jsdom": "^30.0.0",
+    "@types/nodemailer": "^8.0.2",
+    "@types/papaparse": "^5.5.2",
+    "jsdom": "^30.1.3",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.0.0"
+  }
+}

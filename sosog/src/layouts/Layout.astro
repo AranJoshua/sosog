@@ -1,0 +1,61 @@
+---
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+  tone?: 'maroon' | 'navy' | 'cream' | 'ink';
+}
+
+const { title, tone = 'maroon', description = "A record of the historical structures of Sorsogon province: their technical descriptions, histories, and the stories people tell about them." } = Astro.props;
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#211112" />
+    <meta property="og:site_name" content="SOSOG" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title === 'Home' ? 'SOSOG' : `${title} · SOSOG`} />
+    <meta property="og:description" content={description} />
+    <!-- A page change waits for this page's main content before the transition shows it, so the new page never appears half drawn. -->
+    <link rel="expect" href="#main" blocking="render" />
+    <!-- Chromium browsers fetch the other pages ahead of the click (just their HTML), and fetch any other internal link when it is pointed at, so a tab change starts with the page already in hand. Other browsers ignore this. -->
+    <script type="speculationrules" is:inline>
+      {
+        "prefetch": [
+          { "urls": ["/", "/map/", "/technical/", "/history/", "/stories/", "/glimpse/", "/about/", "/explore/"], "eagerness": "eager" },
+          { "where": { "and": [{ "href_matches": "/*" }, { "not": { "href_matches": ["/fonts/*", "/*.jpg", "/*.png", "/*.svg", "/*.ico", "/*.woff2"] } }] }, "eagerness": "moderate" }
+        ]
+      }
+    </script>
+    <link rel="preload" href="/fonts/Maragsa.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/fonts/maragsa.css" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" />
+    <title>{title === 'Home' ? 'SOSOG' : `${title} · SOSOG`}</title>
+    <script is:inline>
+      document.documentElement.classList.add('js');
+      // A structure card that is opened morphs into the photo on the structure page (browsers without cross-document view transitions simply skip this).
+      window.addEventListener('pageswap', (event) => {
+        if (!event.viewTransition || !event.activation || !event.activation.entry) return;
+        const match = new URL(event.activation.entry.url).pathname.match(/^\/structures\/([^/]+)\/?$/);
+        if (!match) return;
+        const card = document.querySelector('[data-sp="' + match[1] + '"] img');
+        if (!card) return;
+        // A structure page already names its own hero photo 'sp-hero'. Going from one structure page to another (a card in "More in ...") would then give two elements the same name, and the browser aborts the whole transition, so the old hero gives up the name first.
+        document.querySelectorAll('figure[style*="sp-hero"]').forEach((hero) => { hero.style.viewTransitionName = 'none'; });
+        card.style.viewTransitionName = 'sp-hero';
+      });
+    </script>
+  </head>
+  <body class="font-body text-cream" id="top" data-tone={tone}>
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:bg-cream focus:px-4 focus:py-2 focus:text-maroon">Skip to content</a>
+    <Nav />
+    <slot />
+    <Footer />
+  </body>
+</html>
