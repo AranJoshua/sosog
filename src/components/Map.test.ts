@@ -96,7 +96,7 @@ describe('ProvinceMap', () => {
     assert.ok(rtl.within(dialog).getByText('St. Joseph Church'));
     assert.ok(rtl.within(dialog).getByText('Coral Rocks'));
     const link = rtl.within(dialog).getByRole('link', { name: 'See more' });
-    assert.equal(link.getAttribute('href'), '/structures/barcelona-st-joseph');
+    assert.equal(link.getAttribute('href'), '/structures/barcelona-st-joseph/');
 
     rtl.fireEvent.keyDown(document, { key: 'Escape' });
     assert.equal(rtl.screen.queryByRole('dialog'), null);

@@ -43,7 +43,7 @@ const stories = structures
             <ul class="deck-stage" data-stage tabindex="0" aria-roledescription="carousel" aria-label="Feature stories">
               {stories.map((s) => (
                 <li class={`page tone-${s.tone}`} data-page style={`--tilt:${s.tilt}deg`}>
-                  <a href={`/structures/${s.id}#story`} data-sp={s.id} class="page-link group">
+                  <a href={`/structures/${s.id}/#story`} data-sp={s.id} class="page-link group">
                     <span class="page-photo">
                       <span class="page-tape" aria-hidden="true"></span>
                       {s.photo ? <img src={s.photo} alt={s.name} width="480" height="360" loading="lazy" decoding="async" draggable="false" /> : <span class="page-nophoto">No photo available</span>}

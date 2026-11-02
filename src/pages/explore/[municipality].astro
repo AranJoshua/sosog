@@ -16,7 +16,7 @@ const { group } = Astro.props;
 <Layout title={group.name} tone="maroon">
   <main id="main">
     <PageHeader title={group.name} intro={`${countLabel(group.items.length)} documented. Open one to read its history and technical description.`}>
-      <a slot="back" href="/explore" class="group inline-block text-[1.02rem] font-bold"><span class="link-draw">All municipalities</span></a>
+      <a slot="back" href="/explore/" class="group inline-block text-[1.02rem] font-bold"><span class="link-draw">All municipalities</span></a>
     </PageHeader>
     <section class="wall-maroon pb-8 pt-10">
       <div class="mx-auto max-w-[84rem] px-5 sm:px-8">

@@ -4,7 +4,7 @@ import { ICON_LABELS, ICON_PATHS, iconKeyFor } from './map/icons';
 import {
   PROVINCE_BOX,
   boxToViewBox,
-  declutter,
+  ringLayout,
   easeInOut,
   lerpBox,
   padBox,
@@ -155,10 +155,10 @@ export default function ProvinceMap({ structures }: MapProps) {
     [structures, municipality]
   );
 
-  // Icon positions for the selected municipality, spread apart so identical or near-identical coordinates stay clickable.
-  const placed = useMemo(() => {
+  // Icon positions for the selected municipality. Pins that would crowd each other sit evenly around one hub, so identical or near-identical coordinates stay clickable.
+  const layout = useMemo(() => {
     const own = points.filter((p) => inMunicipality.some((s) => s.id === p.id));
-    return declutter(own, (PIN_PX * 1.55) / targetScale, (PIN_PX * 5) / targetScale, 240);
+    return ringLayout(own, PIN_PX / targetScale);
   }, [points, inMunicipality, targetScale]);
 
   const active = structures.find((s) => s.id === activeId) ?? null;
@@ -207,6 +207,15 @@ export default function ProvinceMap({ structures }: MapProps) {
     if (found) {
       setMunicipality(found.municipality);
       setActiveId(found.id);
+      // The page already scrolled the map into place before it was drawn (see map.astro); once the fonts and layout have settled, correct any drift.
+      const align = () => {
+        const plate = wrapRef.current;
+        if (!plate) return;
+        const header = document.querySelector<HTMLElement>('[data-header]');
+        const wanted = plate.getBoundingClientRect().top + window.scrollY - ((header?.offsetHeight ?? 72) + 16);
+        if (Math.abs(window.scrollY - wanted) > 8) window.scrollTo({ top: Math.max(0, wanted), behavior: 'auto' });
+      };
+      document.fonts?.ready.then(() => window.requestAnimationFrame(align));
     }
     // Runs once on load; later selections come from clicks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -428,12 +437,23 @@ export default function ProvinceMap({ structures }: MapProps) {
                 );
               })}
 
-            {/* Municipality view: full icons, spread apart where coordinates coincide, with a leader line back to the true position. */}
+            {/* Municipality view: crowded pins sit around a hub with a spoke to each, drawn first so every pin stays on top. */}
+            {municipality &&
+              layout.hubs.map((hub) => (
+                <g key={hub.ids.join('|')} aria-hidden="true" pointerEvents="none">
+                  {hub.ids.map((id) => {
+                    const at = layout.placed.get(id)!;
+                    return <line key={id} x1={hub.x} y1={hub.y - 14 * unit} x2={at.x} y2={at.y - 14 * unit} stroke="#F1EACE" strokeOpacity={0.9} strokeWidth={2 * unit} strokeDasharray={`${4 * unit} ${4 * unit}`} />;
+                  })}
+                  <circle cx={hub.x} cy={hub.y - 14 * unit} r={4 * unit} fill="#F1EACE" stroke="#461717" strokeWidth={1.6 * unit} />
+                </g>
+              ))}
+
+            {/* Municipality view: full icons. */}
             {municipality &&
               inMunicipality.map((s, index) => {
                 const home = points.find((q) => q.id === s.id)!;
-                const at = placed.get(s.id) ?? home;
-                const displaced = Math.hypot(at.x - home.x, at.y - home.y) > 3 * unit;
+                const at = layout.placed.get(s.id) ?? home;
                 const isActive = s.id === activeId;
                 const isHover = s.id === hoverId;
                 const radius = ((isActive ? PIN_PX + 6 : isHover ? PIN_PX + 2 : PIN_PX) / 2) * unit;
@@ -443,12 +463,6 @@ export default function ProvinceMap({ structures }: MapProps) {
                 const lifted = at.y - 14 * unit;
                 return (
                   <g key={s.id}>
-                    {displaced && (
-                      <>
-                        <line x1={home.x} y1={home.y - 11 * unit} x2={at.x} y2={lifted} stroke="#F1EACE" strokeOpacity={0.9} strokeWidth={2 * unit} strokeDasharray={`${4 * unit} ${4 * unit}`} pointerEvents="none" />
-                        <circle cx={home.x} cy={home.y - 11 * unit} r={3 * unit} fill="#F1EACE" pointerEvents="none" />
-                      </>
-                    )}
                     <g
                       ref={(el) => {
                         pinRefs.current[s.id] = el;
@@ -554,7 +568,7 @@ export default function ProvinceMap({ structures }: MapProps) {
                 {active.summary && <p className="mt-4 line-clamp-3 text-[0.98rem] leading-relaxed text-cream/90 sm:line-clamp-4">{active.summary}</p>}
               </div>
               <div className="shrink-0 px-5 pb-5 pt-1">
-                <a href={`/structures/${active.id}`} className="btn btn-sm w-full">
+                <a href={`/structures/${active.id}/`} className="btn btn-sm w-full">
                   See more
                 </a>
               </div>

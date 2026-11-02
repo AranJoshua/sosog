@@ -447,7 +447,8 @@ a:focus-visible > .link-draw,
 
 /* ------------------------------------------------------------------ */
 /* Page transitions (native, no script): the header stays put while the */
-/* page beneath it dissolves and rises.                                  */
+/* page beneath it dissolves and rises, and the cream tab plate glides   */
+/* from the tab you left to the tab you chose.                           */
 /* ------------------------------------------------------------------ */
 @media (prefers-reduced-motion: no-preference) {
   @view-transition {
@@ -459,19 +460,46 @@ a:focus-visible > .link-draw,
   ::view-transition-group(site-header) {
     animation: none;
   }
+  /* The old page stays put and the new one fades in over it while rising 10 px. Fading both at once would dip the page to half brightness midway, so the old one does not fade; plain blending (not the default additive one) keeps the two from adding up to a flash. The shifted top edge sits under the fixed header, so no gap shows. */
   ::view-transition-old(root) {
-    animation: 150ms ease-in both vt-out;
+    animation: none;
+    mix-blend-mode: normal;
   }
   ::view-transition-new(root) {
-    animation: 240ms ease-out 40ms both vt-in;
+    animation: 280ms var(--ease-out) both vt-rise;
+    mix-blend-mode: normal;
   }
-  /* Same-page morphs (the photo viewer) keep the page itself still. */
-  html[data-vt]::view-transition-old(root),
+  /* The plate is carried across, 380 ms, while the two labels trade places inside it at their natural size (a stretched label would look smeared). */
+  ::view-transition-group(nav-tab) {
+    animation-duration: 380ms;
+    animation-timing-function: var(--ease-out);
+    overflow: clip;
+    border-radius: 999px 999px 0 0;
+    background: var(--color-cream);
+  }
+  ::view-transition-old(nav-tab),
+  ::view-transition-new(nav-tab) {
+    inset: 0 auto auto 50%;
+    width: auto;
+    height: 100%;
+    translate: -50% 0;
+    mix-blend-mode: normal;
+  }
+  ::view-transition-old(nav-tab) {
+    animation: 150ms ease-in both vt-out;
+  }
+  ::view-transition-new(nav-tab) {
+    animation: 220ms ease-out 130ms both vt-in;
+  }
+  /* Same-page morphs (the photo viewer): the whole page, header included, dims or brightens in step with the photo, so the header never floats over the viewer. */
+  html[data-vt] .site-header {
+    view-transition-name: none;
+  }
   html[data-vt]::view-transition-new(root) {
-    animation: none;
+    animation: 300ms ease-out both vt-in;
   }
   html[data-vt]::view-transition-group(glimpse) {
-    animation-duration: 560ms;
+    animation-duration: 460ms;
     animation-timing-function: var(--ease-out);
   }
   ::view-transition-group(sp-hero) {
@@ -486,6 +514,12 @@ a:focus-visible > .link-draw,
   @keyframes vt-in {
     from {
       opacity: 0;
+    }
+  }
+  @keyframes vt-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
     }
   }
 }

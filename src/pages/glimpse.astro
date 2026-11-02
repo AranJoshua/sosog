@@ -275,7 +275,7 @@ const header = byNumber.get(GLIMPSE_HEADER_PHOTO) ?? all[0];
 
     <dialog id="glimpse-dialog" class="viewer" aria-label="Photo viewer">
       <div class="viewer-stage">
-        <img id="glimpse-large" src="" alt="" />
+        <img id="glimpse-large" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" />
       </div>
       <button type="button" id="glimpse-close" class="btn btn-sm viewer-close" aria-label="Close viewer">Close</button>
       <button type="button" id="glimpse-prev" class="nav-arrow viewer-prev" aria-label="Previous photo"><Arrow dir="left" /></button>
@@ -424,6 +424,10 @@ const header = byNumber.get(GLIMPSE_HEADER_PHOTO) ?? all[0];
   .viewer[open]::backdrop {
     animation: viewer-fade 0.5s ease both;
   }
+  /* During the photo morph the browser dims the page itself, and its snapshot must already show the full backdrop. */
+  :global(html[data-vt]) .viewer[open]::backdrop {
+    animation: none;
+  }
   @keyframes viewer-fade {
     from {
       opacity: 0;
@@ -440,6 +444,10 @@ const header = byNumber.get(GLIMPSE_HEADER_PHOTO) ?? all[0];
     place-items: center;
   }
   .viewer-stage img {
+    /* --ar is the photo's width over its height. With it the picture fills the same box whether the small or the large file is showing. */
+    aspect-ratio: var(--ar, auto);
+    width: min(calc(100vw - var(--stage-h)), calc((100dvh - var(--stage-v)) * var(--ar, 1)));
+    height: auto;
     max-width: calc(100vw - var(--stage-h));
     max-height: calc(100dvh - var(--stage-v));
     object-fit: contain;
@@ -728,9 +736,30 @@ const header = byNumber.get(GLIMPSE_HEADER_PHOTO) ?? all[0];
     if (!large || tiles.length === 0) return;
     current = (index + tiles.length) % tiles.length;
     const tile = tiles[current];
-    large.setAttribute('data-loading', '');
-    large.onload = () => large.removeAttribute('data-loading');
-    large.src = tile.dataset.large ?? '';
+    const full = tile.dataset.large ?? '';
+    const thumb = tile.querySelector('img');
+    large.dataset.full = full;
+    if (thumb && thumb.complete && thumb.naturalWidth > 0) {
+      // The small picture is already on screen, so show it at once in the large frame and swap in the sharp one when it has loaded. The viewer is never empty, and the photo's size never jumps.
+      large.removeAttribute('data-loading');
+      large.style.setProperty('--ar', String(thumb.naturalWidth / thumb.naturalHeight));
+      large.src = thumb.currentSrc || thumb.src;
+      if (full) {
+        const sharp = new Image();
+        sharp.src = full;
+        sharp
+          .decode()
+          .catch(() => undefined)
+          .then(() => {
+            if (large.dataset.full === full) large.src = full;
+          });
+      }
+    } else {
+      large.style.removeProperty('--ar');
+      large.setAttribute('data-loading', '');
+      large.onload = () => large.removeAttribute('data-loading');
+      large.src = full;
+    }
     const caption = tile.dataset.caption ?? '';
     large.alt = caption || `Glimpse of Sorsogon, photo ${tile.dataset.n}`;
     if (captionEl) captionEl.textContent = caption;
@@ -793,8 +822,11 @@ const header = byNumber.get(GLIMPSE_HEADER_PHOTO) ?? all[0];
     large.style.viewTransitionName = 'glimpse';
     const t = start.call(document, () => {
       large.style.viewTransitionName = '';
-      img.style.viewTransitionName = 'glimpse';
       finish();
+      // Having stepped through photos, the tile may be off screen or cut by the edge: bring it to the middle first, so the photo lands squarely on it.
+      const box = img.getBoundingClientRect();
+      if (box.top < 80 || box.bottom > window.innerHeight - 40) img.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
+      img.style.viewTransitionName = 'glimpse';
     });
     t.finished.finally(() => {
       img.style.viewTransitionName = '';

@@ -35,7 +35,7 @@ const neighbours = all
     />
     {neighbours.length > 0 && (
       <div class="wall-maroon pb-4">
-        <Rail title={`More in ${structure.data.municipality}`} href={`/explore/${slugify(structure.data.municipality)}`} hrefLabel="All in this municipality">
+        <Rail title={`More in ${structure.data.municipality}`} href={`/explore/${slugify(structure.data.municipality)}/`} hrefLabel="All in this municipality">
           {neighbours.map((s) => (
             <li>
               <StructureCard id={s.id} name={s.data.name} municipality={s.data.municipality} photo={s.data.photo} yearBuilt={s.data.yearBuilt} showMunicipality={false} />

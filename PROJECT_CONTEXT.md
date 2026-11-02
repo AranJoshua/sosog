@@ -16,7 +16,7 @@ The site has: a Netflix-style home page, an Explore carousel of municipalities, 
 
 ## 3. Status
 
-- **Code: essentially complete.** The site builds 63 pages from the sample data, which is now a snapshot of the client's real sheet (41 structures, 31 October 2026). Verified: 121 unit tests pass, the typecheck is clean, the link checker is clean, and a headless-browser pass covered home, explore, map (province, municipality, popup, offshore pin, phone width), a structure page, and glimpse.
+- **Code: essentially complete.** The site builds 63 pages from the sample data, which is now a snapshot of the client's real sheet (41 structures, 31 October 2026). Verified: 132 unit tests pass, the typecheck is clean, the link checker is clean, and a headless-browser pass covered home, explore, map (province, municipality, popup, offshore pin, phone width), a structure page, and glimpse.
 - **Not verified**: a real phone, the Cloudflare deployment, and the Cloudflare side of the connection. The `SITE_FEED` tab now exists in the client's sheet and is published as CSV (1 November 2026); the downloaded copy of that published CSV passes validation and builds all 63 pages, and it is the snapshot in `sample-data/site_feed.csv`.
 - **Content state (client side)**: 33 of 41 structures have a history and 10 have a feature story. Eight histories are N/A because DepEd has not replied about some Gabaldon buildings; the team's plan is N/A, or the feature story where one exists. Four structures have a story but no history (Bulan South Central, Bulan North Central, San Ramon, Cumadcad), so their History tab shows the limited-records line. San Rafael Elementary has no photo and no year. The About Us description is written; the team's emails and portraits are still to be added.
 
@@ -92,7 +92,7 @@ The client has marked every item of the original fix list as done (`docs/SOSOG_f
 
 ```
 npm ci
-npm test                 # 121 unit tests, including the map in a simulated browser
+npm test                 # 132 unit tests, including the map in a simulated browser
 npm run typecheck
 # build against the sample data (serve it, then build):
 cd sample-data && python -m http.server 8765      # leave running

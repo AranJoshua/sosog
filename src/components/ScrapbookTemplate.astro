@@ -61,9 +61,9 @@ const storyIsShort = !!featureStory && featureStory.length <= 650;
   <header class="wall-navy">
     <div class="mx-auto max-w-[84rem] px-5 pb-16 pt-10 sm:px-8 sm:pt-14">
       <nav aria-label="Breadcrumb" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[1rem] font-medium">
-        <a href="/explore" class="link-draw">Explore</a>
+        <a href="/explore/" class="link-draw">Explore</a>
         <span class="text-cream/35" aria-hidden="true">/</span>
-        <a href={`/explore/${slugify(municipality)}`} class="link-draw">{municipality}</a>
+        <a href={`/explore/${slugify(municipality)}/`} class="link-draw">{municipality}</a>
       </nav>
 
       <div class="mt-9 grid gap-10 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-stretch lg:gap-16">
@@ -95,7 +95,7 @@ const storyIsShort = !!featureStory && featureStory.length <= 650;
                 ))}
               </dl>
             )}
-            <a href={`/map?s=${id}`} class="btn btn-maroon mt-7 w-full">Show on the map</a>
+            <a href={`/map/?s=${id}`} class="btn btn-maroon mt-7 w-full">Show on the map</a>
           </div>
         </div>
       </div>

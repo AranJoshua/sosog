@@ -56,8 +56,19 @@ const stats = [
       <div class="mx-auto max-w-[84rem] px-5 sm:px-8">
         <ProvinceMap structures={pins} client:load />
         <noscript>
-          <p class="mt-4 text-cream/80">The interactive map needs JavaScript. You can still browse every structure from the <a class="underline" href="/explore">Explore</a> page.</p>
+          <p class="mt-4 text-cream/80">The interactive map needs JavaScript. You can still browse every structure from the <a class="underline" href="/explore/">Explore</a> page.</p>
         </noscript>
+        <script is:inline>
+          // A link such as /map/?s=<structure id> comes from "Show on the map". The map sits below the introduction, so scroll it into place now, before the page is first drawn.
+          (function () {
+            if (!/[?&]s=/.test(location.search)) return;
+            var plate = document.querySelector('.map-plate');
+            if (!plate) return;
+            var header = document.querySelector('[data-header]');
+            var offset = (header ? header.offsetHeight : 72) + 16;
+            window.scrollTo(0, Math.max(0, plate.getBoundingClientRect().top + window.scrollY - offset));
+          })();
+        </script>
       </div>
     </div>
   </main>

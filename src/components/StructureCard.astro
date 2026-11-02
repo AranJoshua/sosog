@@ -15,7 +15,7 @@ const { id, name, municipality, photo: photoKey, yearBuilt, showMunicipality = t
 const photo = getStructurePhoto(photoKey ?? id, 'thumb');
 const meta = [showMunicipality ? municipality : null, yearBuilt].filter(Boolean).join(', ');
 ---
-<a href={`/structures/${id}`} data-sp={id} class={`print group ${extra}`}>
+<a href={`/structures/${id}/`} data-sp={id} class={`print group ${extra}`}>
   <span class="print-frame">
     {photo ? (
       <span class="print-img"><img src={photo} alt="" width="480" height="360" loading="lazy" decoding="async" draggable="false" /></span>

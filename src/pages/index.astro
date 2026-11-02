@@ -89,12 +89,12 @@ const glimpse = picked.length >= 7 ? picked.slice(0, 7) : [...picked, ...all.fil
         <div class="mx-auto max-w-[84rem] px-5 sm:px-8">
           <div class="flex flex-wrap items-end justify-between gap-x-10 gap-y-4">
             <h2 class="display-lg">Glimpse of Sorsogon</h2>
-            <a href="/glimpse" class="btn">See every photo</a>
+            <a href="/glimpse/" class="btn">See every photo</a>
           </div>
           <ul class="mt-16 grid grid-cols-2 gap-5 sm:grid-cols-4 lg:grid-cols-7">
             {glimpse.map((p, i) => (
               <li class:list={[{ 'lg:translate-y-14': i % 2 === 1 }]}>
-                <a href={`/glimpse#p${p.n}`} class="glimpse-tile group block bg-cream p-[6px] shadow-[0_22px_30px_-20px_rgb(0_0_0/0.85)]" aria-label={`Open photo ${p.n} of Sorsogon`}>
+                <a href={`/glimpse/#p${p.n}`} class="glimpse-tile group block bg-cream p-[6px] shadow-[0_22px_30px_-20px_rgb(0_0_0/0.85)]" aria-label={`Open photo ${p.n} of Sorsogon`}>
                   <span class="block overflow-hidden"><img src={p.thumb} alt="" width="360" height="480" loading="lazy" decoding="async" class="aspect-[3/4] w-full object-cover" /></span>
                 </a>
               </li>

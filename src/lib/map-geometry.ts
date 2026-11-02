@@ -165,6 +165,75 @@ export function declutter<T extends Point & { id: string }>(
   return new Map(current.map((c) => [c.id, { x: c.x, y: c.y }]));
 }
 
+export interface PinHub {
+  x: number;
+  y: number;
+  ids: string[];
+}
+
+/**
+ * Lays out the pins of one municipality. Pins whose true positions are close
+ * enough to crowd each other form a cluster: they are placed evenly around a
+ * ring centred on the cluster, so none covers another or the centre, and the
+ * caller draws one hub at the centre with a spoke to each pin. Pins with room
+ * to themselves stay exactly where they are. Members take their ring slots in
+ * the order they lie around the centre, so spokes never cross. Deterministic:
+ * the same input always gives the same output.
+ */
+export function ringLayout<T extends Point & { id: string }>(
+  points: T[],
+  pinSize: number
+): { placed: Map<string, Point>; hubs: PinHub[] } {
+  const link = pinSize * 1.7;
+  const parent = points.map((_, i) => i);
+  const find = (i: number): number => {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]];
+      i = parent[i];
+    }
+    return i;
+  };
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      if (Math.hypot(points[j].x - points[i].x, points[j].y - points[i].y) < link) parent[find(j)] = find(i);
+    }
+  }
+  const groups = new Map<number, T[]>();
+  points.forEach((p, i) => {
+    const root = find(i);
+    groups.set(root, [...(groups.get(root) ?? []), p]);
+  });
+
+  const placed = new Map<string, Point>();
+  const hubs: PinHub[] = [];
+  for (const members of groups.values()) {
+    if (members.length === 1) {
+      placed.set(members[0].id, { x: members[0].x, y: members[0].y });
+      continue;
+    }
+    const cx = members.reduce((sum, m) => sum + m.x, 0) / members.length;
+    const cy = members.reduce((sum, m) => sum + m.y, 0) / members.length;
+    const ordered = [...members].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx) || a.id.localeCompare(b.id));
+    const n = ordered.length;
+    const radius = Math.max(pinSize * 0.98, (pinSize * 1.4) / (2 * Math.sin(Math.PI / n)));
+    const start = n % 2 === 0 ? -Math.PI / 2 + Math.PI / n : -Math.PI / 2;
+    ordered.forEach((m, k) => {
+      const angle = start + (k * 2 * Math.PI) / n;
+      placed.set(m.id, { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) });
+    });
+    hubs.push({ x: cx, y: cy, ids: ordered.map((m) => m.id) });
+  }
+
+  // Two different clusters can still crowd each other; nudge only the pins that do.
+  const settled = declutter(
+    [...placed].map(([id, p]) => ({ id, x: p.x, y: p.y })),
+    pinSize * 1.3,
+    pinSize * 3,
+    60
+  );
+  return { placed: settled, hubs };
+}
+
 /**
  * Re-frames `box` so its content sits inside the part of a `width` x `height`
  * pixel viewport that is not covered by an overlay: `left` pixels reserved on

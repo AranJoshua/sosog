@@ -1,4 +1,5 @@
 import { MUNICIPALITIES } from '../../src/lib/municipalities.js';
+import { tidyProse } from './clean-text.js';
 
 export const EXPECTED_HEADERS = [
   'name',
@@ -110,6 +111,12 @@ export function stripControlJunk(text: string): string {
  */
 const NOT_APPLICABLE = /^(?:n\s*\/\s*a|n\.\s*a\.?|na)$/i;
 
+/** The three long texts also get their pasted line breaks and stray spaces tidied (see clean-text.ts). */
+function normalizeProse(raw: string | undefined): string | null {
+  const text = normalizeContentField(raw);
+  return text === null ? null : tidyProse(text) || null;
+}
+
 function normalizeContentField(raw: string | undefined): string | null {
   const trimmed = stripControlJunk(raw ?? '').trim();
   return trimmed.length > 0 && !NOT_APPLICABLE.test(trimmed) ? trimmed : null;
@@ -156,9 +163,9 @@ export function validateRow(row: RawRow, rowNumber: number): RowValidationResult
       municipality,
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
-      history: normalizeContentField(row.history),
-      technicalDescription: normalizeContentField(row.technical_description),
-      featureStory: normalizeContentField(row.feature_story),
+      history: normalizeProse(row.history),
+      technicalDescription: normalizeProse(row.technical_description),
+      featureStory: normalizeProse(row.feature_story),
       yearBuilt: normalizeContentField(row.year_built),
       classification: normalizeContentField(row.classification),
       materials: normalizeContentField(row.materials),

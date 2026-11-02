@@ -57,7 +57,7 @@ const stats = [
       </dl>
       <div class="th-actions">
         <a href="#explore" class="btn">Explore the province</a>
-        <a href="/map" class="btn btn-navy">Open the map</a>
+        <a href="/map/" class="btn btn-navy">Open the map</a>
       </div>
     </div>
 
@@ -68,8 +68,8 @@ const stats = [
             <p class="th-tag">{[s.municipality, s.year].filter(Boolean).join(', ')}</p>
             <p class="th-name font-display">{s.name}</p>
             <p class="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-[1.02rem] font-bold">
-              <a href={`/structures/${s.id}`} data-sp={s.id} class="group"><span class="link-draw">Read its history</span></a>
-              <a href={`/map?s=${s.id}`} class="group"><span class="link-draw">Find it on the map</span></a>
+              <a href={`/structures/${s.id}/`} data-sp={s.id} class="group"><span class="link-draw">Read its history</span></a>
+              <a href={`/map/?s=${s.id}`} class="group"><span class="link-draw">Find it on the map</span></a>
             </p>
           </div>
         ))}

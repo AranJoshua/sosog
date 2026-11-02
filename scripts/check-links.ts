@@ -90,6 +90,8 @@ async function main() {
   }
 
   const broken: { file: string; attribute: string; target: string }[] = [];
+  // A page link without its trailing slash (/map instead of /map/) makes the host answer with a redirect first, which adds a round trip to every click.
+  const slashless: { file: string; target: string }[] = [];
 
   for (const file of htmlFiles) {
     const html = await readFile(file, 'utf8');
@@ -99,6 +101,11 @@ async function main() {
       const ok = await resolveTarget(ref.target, file);
       if (!ok) {
         broken.push({ file: relativeFile, attribute: ref.attribute, target: ref.target });
+      } else if (ref.attribute === 'href') {
+        const [urlPath] = ref.target.split('#')[0].split('?');
+        if (urlPath.startsWith('/') && !urlPath.endsWith('/') && path.extname(urlPath) === '') {
+          slashless.push({ file: relativeFile, target: ref.target });
+        }
       }
     }
   }
@@ -107,6 +114,14 @@ async function main() {
     console.error(`[check-links] ${broken.length} broken reference(s) found:`);
     for (const b of broken) {
       console.error(`  ${b.file}: ${b.attribute}="${b.target}"`);
+    }
+    process.exit(1);
+  }
+
+  if (slashless.length > 0) {
+    console.error(`[check-links] ${slashless.length} page link(s) are missing their trailing slash:`);
+    for (const l of slashless) {
+      console.error(`  ${l.file}: href="${l.target}"`);
     }
     process.exit(1);
   }

@@ -1,16 +1,17 @@
 ---
 const links = [
   { href: '/', label: 'Home' },
-  { href: '/map', label: 'Map' },
-  { href: '/technical', label: 'Technical Description' },
-  { href: '/history', label: 'History' },
-  { href: '/stories', label: 'Feature Stories' },
-  { href: '/glimpse', label: 'Glimpse of Sorsogon' },
-  { href: '/about', label: 'About Us' }
+  { href: '/map/', label: 'Map' },
+  { href: '/technical/', label: 'Technical Description' },
+  { href: '/history/', label: 'History' },
+  { href: '/stories/', label: 'Feature Stories' },
+  { href: '/glimpse/', label: 'Glimpse of Sorsogon' },
+  { href: '/about/', label: 'About Us' }
 ];
 
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
-const isActive = (href: string) => (href === '/' ? path === '/' : path === href || path.startsWith(`${href}/`));
+const bare = (href: string) => href.replace(/\/$/, '') || '/';
+const isActive = (href: string) => (href === '/' ? path === '/' : path === bare(href) || path.startsWith(`${bare(href)}/`));
 // The Explore and structure pages belong to the home section of the site.
 const onExplore = path === '/explore' || path.startsWith('/explore/') || path.startsWith('/structures/');
 const current = (href: string) => isActive(href) || (onExplore && href === '/');
@@ -22,7 +23,6 @@ const current = (href: string) => isActive(href) || (onExplore && href === '/');
     </a>
 
     <ul class="nav-links relative hidden h-[3.1rem] items-stretch gap-1 lg:flex" data-nav-links>
-      <li class="nav-plate pointer-events-none absolute bottom-0 left-0 top-0 bg-cream" aria-hidden="true" role="presentation"></li>
       {links.map((link) => (
         <li class="relative">
           <a href={link.href} aria-current={current(link.href) ? 'page' : undefined} class="nav-link relative z-[1] flex h-full items-center px-4 text-[0.97rem] font-semibold">
@@ -64,24 +64,21 @@ const current = (href: string) => isActive(href) || (onExplore && href === '/');
     color: var(--color-cream);
     transition: color 0.2s ease-out, background-color 0.2s ease-out;
   }
-  .nav-link[data-lit] {
+  /* The tab you are on is a solid cream arch-topped plate, drawn by the server so it is in place from the first paint. It carries a view-transition name, so moving to another tab makes the browser carry the plate across to it (see global.css). */
+  .nav-link[aria-current='page'] {
+    background: var(--color-cream);
     color: var(--color-maroon);
+    border-radius: 999px 999px 0 0;
+    view-transition-name: nav-tab;
   }
-  /* Pointing at another link only tints it; the plate stays on the page you are on. */
+  /* While the photo viewer on the Glimpse page opens or closes, the whole page dims, so the plate must not float above it. */
+  :global(html[data-vt]) .nav-link[aria-current='page'] {
+    view-transition-name: none;
+  }
+  /* Pointing at another link only tints it. */
   .nav-link:not([aria-current='page']):hover,
   .nav-link:not([aria-current='page']):focus-visible {
     background: color-mix(in srgb, var(--color-cream) 16%, transparent);
-    border-radius: 999px 999px 0 0;
-  }
-  /* A solid cream arch-topped plate that stands behind the link in use and slides to the one pointed at, like a niche in a wall. */
-  .nav-plate {
-    border-radius: 999px 999px 0 0;
-    opacity: 0;
-    transition: transform 0.35s var(--ease-out), width 0.35s var(--ease-out), opacity 0.3s;
-  }
-  :global(html:not(.js)) .nav-link[aria-current='page'] {
-    background: var(--color-cream);
-    color: var(--color-maroon);
     border-radius: 999px 999px 0 0;
   }
 
@@ -163,54 +160,6 @@ const current = (href: string) => isActive(href) || (onExplore && href === '/');
   const header = document.querySelector<HTMLElement>('[data-header]');
   if (header) {
     const root = document.documentElement;
-
-    // Sliding plate behind the desktop links.
-    const list = header.querySelector<HTMLElement>('[data-nav-links]');
-    const plate = list?.querySelector<HTMLElement>('.nav-plate');
-    if (list && plate) {
-      const links = Array.from(list.querySelectorAll<HTMLAnchorElement>('.nav-link'));
-      const current = links.find((l) => l.getAttribute('aria-current') === 'page') ?? null;
-      let primed = false;
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const place = (el: HTMLElement | null) => {
-        links.forEach((l) => (l === el ? l.setAttribute('data-lit', '') : l.removeAttribute('data-lit')));
-        if (!el) {
-          plate.style.opacity = '0';
-          return;
-        }
-        const box = (el.parentElement as HTMLElement);
-        if (!primed) {
-          // Start where the plate stood on the previous page, then glide to this page's tab.
-          let from = { left: box.offsetLeft, width: box.offsetWidth };
-          try {
-            const saved = JSON.parse(sessionStorage.getItem('sosog-plate') ?? 'null');
-            if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.width) && !reducedMotion) from = saved;
-          } catch {}
-          plate.style.transition = 'none';
-          plate.style.transform = `translateX(${from.left}px)`;
-          plate.style.width = `${from.width}px`;
-          void plate.offsetWidth;
-          plate.style.transition = '';
-          primed = true;
-          plate.style.transform = `translateX(${box.offsetLeft}px)`;
-          plate.style.width = `${box.offsetWidth}px`;
-        } else {
-          plate.style.transform = `translateX(${box.offsetLeft}px)`;
-          plate.style.width = `${box.offsetWidth}px`;
-        }
-        plate.style.opacity = '1';
-      };
-      place(current);
-      window.addEventListener('resize', () => place(current));
-      window.addEventListener('pagehide', () => {
-        const box = current?.parentElement;
-        if (!box) return;
-        try {
-          sessionStorage.setItem('sosog-plate', JSON.stringify({ left: box.offsetLeft, width: box.offsetWidth }));
-        } catch {}
-      });
-      document.fonts?.ready.then(() => place(current));
-    }
 
     // Phone and tablet menu.
     const btn = header.querySelector<HTMLButtonElement>('[data-menu-btn]');

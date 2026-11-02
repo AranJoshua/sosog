@@ -14,7 +14,7 @@
     "validate:data": "tsx scripts/validate-data.ts",
     "typecheck": "astro check",
     "check:links": "tsx scripts/check-links.ts",
-    "test": "node --import tsx --test scripts/lib/validate-row.test.ts scripts/lib/is-main.test.ts scripts/sync-sheet.test.ts scripts/validate-data.test.ts src/lib/photos.test.ts src/lib/map-geometry.test.ts src/components/Map.test.ts src/lib/text.test.ts src/lib/variant.test.ts src/lib/motion.test.ts src/lib/structures.test.ts src/lib/intervention.test.ts src/lib/intervention-art.test.ts"
+    "test": "node --import tsx --test scripts/lib/validate-row.test.ts scripts/lib/clean-text.test.ts scripts/lib/is-main.test.ts scripts/sync-sheet.test.ts scripts/validate-data.test.ts src/lib/photos.test.ts src/lib/map-geometry.test.ts src/components/Map.test.ts src/lib/text.test.ts src/lib/variant.test.ts src/lib/motion.test.ts src/lib/structures.test.ts src/lib/intervention.test.ts src/lib/intervention-art.test.ts"
   },
   "dependencies": {
     "@astrojs/react": "^7.0.0",

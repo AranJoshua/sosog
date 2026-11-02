@@ -23,7 +23,7 @@ const middle = Math.floor(slides.length / 2);
   <ul class="arcade-track gutter" data-track>
     {slides.map((slide, i) => (
       <li class:list={['arch', { 'is-active': i === middle }]} style={`--i:${i}`} data-arch>
-        <a href={`/explore/${slide.slug}`} class="group" aria-label={`${slide.name}, ${countLabel(slide.count)}`}>
+        <a href={`/explore/${slide.slug}/`} class="group" aria-label={`${slide.name}, ${countLabel(slide.count)}`}>
           <span class="arch-clip">
             <span class="arch-in">
               {slide.photo ? (

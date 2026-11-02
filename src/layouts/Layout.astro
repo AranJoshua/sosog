@@ -21,6 +21,17 @@ const { title, tone = 'maroon', description = "A record of the historical struct
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title === 'Home' ? 'SOSOG' : `${title} · SOSOG`} />
     <meta property="og:description" content={description} />
+    <!-- A page change waits for this page's main content before the transition shows it, so the new page never appears half drawn. -->
+    <link rel="expect" href="#main" blocking="render" />
+    <!-- Chromium browsers fetch the other pages ahead of the click (just their HTML), and fetch any other internal link when it is pointed at, so a tab change starts with the page already in hand. Other browsers ignore this. -->
+    <script type="speculationrules" is:inline>
+      {
+        "prefetch": [
+          { "urls": ["/", "/map/", "/technical/", "/history/", "/stories/", "/glimpse/", "/about/", "/explore/"], "eagerness": "eager" },
+          { "where": { "and": [{ "href_matches": "/*" }, { "not": { "href_matches": ["/fonts/*", "/*.jpg", "/*.png", "/*.svg", "/*.ico", "/*.woff2"] } }] }, "eagerness": "moderate" }
+        ]
+      }
+    </script>
     <link rel="preload" href="/fonts/Maragsa.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/fonts/maragsa.css" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

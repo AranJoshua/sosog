@@ -11,6 +11,7 @@ import {
   boxToViewBox,
   easeInOut,
   declutter,
+  ringLayout,
   reserveBox,
   MAP_SIZE,
   MAP_HEIGHT
@@ -145,5 +146,61 @@ describe('reserveBox', () => {
     const scale = 700 / view.h;
     const contentBottomPx = (box.y + box.h - view.y) * scale;
     assert.ok(contentBottomPx <= 700 - 420 + 1e-6, `content ends at ${contentBottomPx}px`);
+  });
+});
+
+describe('ringLayout', () => {
+  const PIN = 34;
+  const pairwiseMin = (placed: Map<string, { x: number; y: number }>) => {
+    const pts = [...placed.values()];
+    let min = Infinity;
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) min = Math.min(min, Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y));
+    return min;
+  };
+
+  test('leaves pins that have room to themselves exactly where they are, with no hub', () => {
+    const { placed, hubs } = ringLayout([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 400, y: 0 }], PIN);
+    assert.deepEqual(placed.get('a'), { x: 0, y: 0 });
+    assert.deepEqual(placed.get('b'), { x: 400, y: 0 });
+    assert.equal(hubs.length, 0);
+  });
+
+  test('places crowded pins evenly around one hub, clear of each other and of the hub', () => {
+    const crowd = [
+      { id: 'a', x: 100, y: 100 },
+      { id: 'b', x: 104, y: 98 },
+      { id: 'c', x: 99, y: 106 },
+      { id: 'd', x: 103, y: 103 }
+    ];
+    const { placed, hubs } = ringLayout(crowd, PIN);
+    assert.equal(hubs.length, 1);
+    assert.deepEqual([...hubs[0].ids].sort(), ['a', 'b', 'c', 'd']);
+    assert.ok(pairwiseMin(placed) >= PIN * 1.3 - 1e-6, 'pins crowd each other');
+    for (const id of hubs[0].ids) {
+      const p = placed.get(id)!;
+      assert.ok(Math.hypot(p.x - hubs[0].x, p.y - hubs[0].y) >= PIN * 0.98 - 1e-6, 'a pin covers the hub');
+    }
+  });
+
+  test('handles identical coordinates and gives the same answer every time', () => {
+    const same = Array.from({ length: 5 }, (_, i) => ({ id: `p${i}`, x: 50, y: 50 }));
+    const first = ringLayout(same, PIN);
+    const second = ringLayout(same, PIN);
+    assert.ok(pairwiseMin(first.placed) >= PIN * 1.3 - 1e-6);
+    assert.deepEqual([...first.placed], [...second.placed]);
+    assert.deepEqual(first.hubs, second.hubs);
+  });
+
+  test('keeps a lone pin out of a nearby cluster and still separates two clusters that touch', () => {
+    const { placed } = ringLayout(
+      [
+        { id: 'a', x: 0, y: 0 },
+        { id: 'b', x: 3, y: 0 },
+        { id: 'c', x: 90, y: 0 },
+        { id: 'd', x: 93, y: 0 }
+      ],
+      PIN
+    );
+    assert.ok(pairwiseMin(placed) >= PIN * 1.3 - 1e-6);
   });
 });
