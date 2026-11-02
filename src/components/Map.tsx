@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { MUNICIPALITY_BOUNDARIES } from './map/boundaries';
-import { ICON_LABELS, ICON_PATHS, iconKeyFor } from './map/icons';
+import { ICON_FIT, ICON_LABELS, ICON_PATHS, iconKeyFor } from './map/icons';
 import {
   PROVINCE_BOX,
   boxToViewBox,
@@ -457,8 +457,10 @@ export default function ProvinceMap({ structures }: MapProps) {
                 const isActive = s.id === activeId;
                 const isHover = s.id === hoverId;
                 const radius = ((isActive ? PIN_PX + 6 : isHover ? PIN_PX + 2 : PIN_PX) / 2) * unit;
-                const glyph = (radius * 1.1) / 12;
                 const key = iconKeyFor(s.classification);
+                // Scale each glyph by its own farthest point so every shape stays inside the circle, then centre it on the pin.
+                const fit = ICON_FIT[key];
+                const glyph = (radius * 0.8) / fit.r;
                 const ink = isActive ? '#F1EACE' : '#461717';
                 const lifted = at.y - 14 * unit;
                 return (
@@ -480,7 +482,7 @@ export default function ProvinceMap({ structures }: MapProps) {
                     >
                       <ellipse cx={at.x} cy={lifted + radius * 1.12} rx={radius * 0.85} ry={radius * 0.28} fill="#000" fillOpacity={0.35} />
                       <circle cx={at.x} cy={lifted} r={radius} fill={isActive ? '#211112' : '#F1EACE'} stroke={isActive ? '#F1EACE' : '#461717'} strokeWidth={2.4 * unit} />
-                      <path d={ICON_PATHS[key]} fill={ink} transform={`translate(${at.x - 12 * glyph} ${lifted - 12 * glyph}) scale(${glyph})`} pointerEvents="none" />
+                      <path d={ICON_PATHS[key]} fill={ink} transform={`translate(${at.x - fit.cx * glyph} ${lifted - fit.cy * glyph}) scale(${glyph})`} pointerEvents="none" />
                       {isActive && (
                         <g aria-hidden="true" pointerEvents="none">
                           <circle className="pulse" cx={at.x} cy={lifted} r={radius} fill="none" stroke="#F1EACE" strokeWidth={3 * unit} />
@@ -568,7 +570,19 @@ export default function ProvinceMap({ structures }: MapProps) {
                 {active.summary && <p className="mt-4 line-clamp-3 text-[0.98rem] leading-relaxed text-cream/90 sm:line-clamp-4">{active.summary}</p>}
               </div>
               <div className="shrink-0 px-5 pb-5 pt-1">
-                <a href={`/structures/${active.id}/`} className="btn btn-sm w-full">
+                <a
+                  href={`/structures/${active.id}/`}
+                  className="btn btn-sm w-full"
+                  onClick={(e) => {
+                    // The structure page reads this to ease itself down to the photo after it opens (see ScrapbookTemplate.astro).
+                    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                    try {
+                      sessionStorage.setItem('sosog:see-more', active.id);
+                    } catch {
+                      /* storage can be unavailable; the page then simply opens at the top */
+                    }
+                  }}
+                >
                   See more
                 </a>
               </div>

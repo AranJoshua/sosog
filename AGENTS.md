@@ -131,3 +131,9 @@ Note (audit, Sept 2026): `wrangler` was added to the root `package.json` as a de
 ## Text from the sheet
 
 The three long texts (history, technical description, feature story) are tidied when the sheet is read (`scripts/lib/clean-text.ts`): a line break inside a sentence, as PDFs and Word files leave behind, is joined back; a break after a finished sentence stays as one blank line between paragraphs; stray spaces around punctuation, brackets and quotation marks are removed. No word is ever changed. Fix the source sheet where you can, but the site no longer shows pasted line breaks.
+
+## Map pins, photo viewer and "See more" (November 2, 2026)
+
+- Pin glyphs are scaled and centred through `ICON_FIT` in `src/components/map/icons.ts` (each glyph's outline centre and farthest-point distance), so no shape can reach past its pin's circle. A new glyph needs an entry there, measured the same way.
+- The Glimpse viewer's backdrop fade (`data-fade` on the dialog) runs only when the viewer opens without the photo morph. During the morph the browser dims the page itself, and a fade started afterwards flashes the page back to full brightness.
+- "See more" in the map popup stores the structure id in `sessionStorage` (`sosog:see-more`). The popup photo morphs into the hero photo (`pageswap` in `Layout.astro`), and the structure page then eases down so the hero photo sits in the middle of the space under the header (inline script in `ScrapbookTemplate.astro`). Other ways of opening a structure page are unchanged.

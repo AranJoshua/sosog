@@ -57,7 +57,7 @@ const photoLayout = pickVariant(`${name}-layout`, 3);
 const pullQuote = featureStory && featureStory.length > 650 ? extractPullQuote(featureStory) : null;
 const storyIsShort = !!featureStory && featureStory.length <= 650;
 ---
-<article>
+<article data-structure={id}>
   <header class="wall-navy">
     <div class="mx-auto max-w-[84rem] px-5 pb-16 pt-10 sm:px-8 sm:pt-14">
       <nav aria-label="Breadcrumb" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[1rem] font-medium">
@@ -67,7 +67,7 @@ const storyIsShort = !!featureStory && featureStory.length <= 650;
       </nav>
 
       <div class="mt-9 grid gap-10 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-stretch lg:gap-16">
-        <figure class="print-frame" style="view-transition-name: sp-hero">
+        <figure class="print-frame" style="view-transition-name: sp-hero" data-hero>
           {heroPhoto ? (
             <div class="relative lg:h-full"><img src={heroPhoto} alt={name} width="1600" height="1200" decoding="async" fetchpriority="high" class="aspect-[4/3] w-full object-cover lg:absolute lg:inset-0 lg:aspect-auto lg:h-full" /></div>
           ) : (
@@ -183,6 +183,43 @@ const storyIsShort = !!featureStory && featureStory.length <= 650;
     </div>
   </div>
 </article>
+<!-- Opened through "See more" on the map: once the photo has finished growing into place, the page eases down a little so the photo sits in the middle of the space under the header. It sits inside main, so it runs before the page is first drawn. -->
+<script is:inline>
+  (function () {
+    var KEY = 'sosog:see-more';
+    var from = null;
+    try {
+      from = sessionStorage.getItem(KEY);
+      sessionStorage.removeItem(KEY);
+    } catch (e) {}
+    var article = document.querySelector('[data-structure]');
+    var hero = document.querySelector('[data-hero]');
+    if (!from || !article || !hero || article.getAttribute('data-structure') !== from) return;
+    var done = false;
+    function settle() {
+      if (done) return;
+      done = true;
+      var header = document.querySelector('[data-header]');
+      var headerH = header ? header.getBoundingClientRect().bottom : 0;
+      var box = hero.getBoundingClientRect();
+      var room = window.innerHeight - headerH;
+      var gap = box.height >= room ? 24 : (room - box.height) / 2;
+      var top = Math.max(0, box.top + window.scrollY - headerH - gap);
+      if (top < 8 || Math.abs(top - window.scrollY) < 8) return;
+      var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: top, behavior: calm ? 'auto' : 'smooth' });
+    }
+    if ('onpagereveal' in window) {
+      window.addEventListener('pagereveal', function (e) {
+        if (e.viewTransition) e.viewTransition.finished.then(settle, settle);
+        else window.setTimeout(settle, 120);
+      });
+      window.setTimeout(settle, 2500);
+    } else {
+      window.addEventListener('load', function () { window.setTimeout(settle, 150); });
+    }
+  })();
+</script>
 
 <style>
   /* Every sheet is one label column and one reading column, so the page width is used and the text keeps a comfortable line length. */

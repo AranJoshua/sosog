@@ -17,6 +17,22 @@ export const ICON_PATHS: Record<IconKey, string> = {
   landmark: 'M12 4l2.5 5 5.5.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.5-.8L12 4z'
 };
 
+/**
+ * Where each glyph sits inside its 24x24 box: the centre of its outline and the distance from that centre to its
+ * farthest point. The map scales and centres every glyph with these numbers so that no part of it can reach past
+ * the pin's circle, whatever its shape.
+ */
+export const ICON_FIT: Record<IconKey, { cx: number; cy: number; r: number }> = {
+  church: { cx: 12, cy: 11.25, r: 11.7 },
+  school: { cx: 12, cy: 11.5, r: 11.7 },
+  house: { cx: 12, cy: 11.5, r: 11 },
+  civic: { cx: 12, cy: 11.5, r: 13.7 },
+  tower: { cx: 12, cy: 12, r: 10.6 },
+  ruins: { cx: 12, cy: 13.5, r: 11.8 },
+  lighthouse: { cx: 12, cy: 11.5, r: 10.8 },
+  landmark: { cx: 12, cy: 11.6, r: 9.1 }
+};
+
 export const ICON_LABELS: Record<IconKey, string> = {
   church: 'Church',
   school: 'School building',

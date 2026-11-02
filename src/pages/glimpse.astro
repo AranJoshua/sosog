@@ -421,12 +421,9 @@ const header = byNumber.get(GLIMPSE_HEADER_PHOTO) ?? all[0];
     background: color-mix(in srgb, var(--color-ink) 93%, transparent);
     backdrop-filter: blur(10px);
   }
-  .viewer[open]::backdrop {
+  /* Only the plain open (no photo morph) fades the backdrop in. During the morph the browser dims the page itself, and a fade that started afterwards would flash the page back to full brightness. */
+  .viewer[open][data-fade]::backdrop {
     animation: viewer-fade 0.5s ease both;
-  }
-  /* During the photo morph the browser dims the page itself, and its snapshot must already show the full backdrop. */
-  :global(html[data-vt]) .viewer[open]::backdrop {
-    animation: none;
   }
   @keyframes viewer-fade {
     from {
@@ -798,7 +795,11 @@ const header = byNumber.get(GLIMPSE_HEADER_PHOTO) ?? all[0];
     morph(
       () => {
         setImage(index);
-        if (!dialog.open) dialog.showModal();
+        if (!dialog.open) {
+          if (document.documentElement.dataset.vt) delete dialog.dataset.fade;
+          else dialog.dataset.fade = '';
+          dialog.showModal();
+        }
       },
       img as HTMLElement | null,
       large
@@ -809,6 +810,7 @@ const header = byNumber.get(GLIMPSE_HEADER_PHOTO) ?? all[0];
     if (!dialog || !dialog.open) return;
     const img = tiles[current]?.querySelector('img') as HTMLElement | null;
     const finish = () => {
+      delete dialog.dataset.fade;
       dialog.close();
       history.replaceState(null, '', location.pathname);
     };
